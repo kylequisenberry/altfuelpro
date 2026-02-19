@@ -319,6 +319,30 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  cardDiscontinued: {
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+    opacity: 0.9,
+  },
+  discontinuedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.warning,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 12,
+    gap: 6,
+  },
+  discontinuedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  iconDiscontinued: {
+    backgroundColor: COLORS.textSecondary + '15',
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
