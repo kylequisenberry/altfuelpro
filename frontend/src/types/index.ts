@@ -107,6 +107,8 @@ export interface FuelSystemProvider {
   headquarters?: string;
   products: string[];
   formerly_known_as?: string;
+  status?: string;  // "active", "discontinued", etc.
+  locations?: Record<string, string>;  // Additional location details
 }
 
 export interface InspectorLookupLinks {
