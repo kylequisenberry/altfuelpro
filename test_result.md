@@ -402,17 +402,17 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "1.1"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "GET /api/stations - Fetch all fuel stations with filters"
-    - "GET /api/regulations - Fetch all regulations with filters"
-    - "GET /api/service-centers - Fetch all service centers with filters"
-    - "GET /api/inspectors - Fetch all inspectors with filters"
-    - "GET/PUT /api/profile - User profile management"
+    - "AFDC/NREL API Integration - Real fuel station data"
+    - "GET /api/health - Health check with AFDC status"
+    - "GET /api/fuel-types - Complete fuel type catalog"
+    - "GET /api/inspector-lookup-links - AFVi and CSA links"
+    - "GET /api/providers - 15 fuel system providers with search/filter"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
