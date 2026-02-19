@@ -25,6 +25,8 @@ export const FUEL_TYPE_COLORS: Record<string, string> = {
   Diesel: '#795548',
   Gasoline: '#F44336',
   Biodiesel: '#8BC34A',
+  E85: '#FF5722',
+  LPG: '#00BCD4',
 };
 
 export const FUEL_TYPE_ICONS: Record<string, string> = {
@@ -35,10 +37,25 @@ export const FUEL_TYPE_ICONS: Record<string, string> = {
   Diesel: 'water',
   Gasoline: 'water',
   Biodiesel: 'leaf',
+  E85: 'water',
+  LPG: 'flame',
 };
 
 export const STATUS_COLORS: Record<string, string> = {
   Operational: '#4CAF50',
   'Under Maintenance': '#FFA000',
+  'Temporarily Unavailable': '#FFA000',
   Closed: '#D32F2F',
+  Planned: '#2196F3',
+  Unknown: '#757575',
 };
+
+export const FUEL_TYPES = [
+  { id: 'Electric', name: 'Electric (EV)', icon: 'flash' },
+  { id: 'CNG', name: 'Compressed Natural Gas', icon: 'gas-cylinder' },
+  { id: 'LNG', name: 'Liquefied Natural Gas', icon: 'snowflake' },
+  { id: 'Hydrogen', name: 'Hydrogen', icon: 'atom' },
+  { id: 'Biodiesel', name: 'Biodiesel', icon: 'leaf' },
+  { id: 'E85', name: 'Ethanol (E85)', icon: 'water' },
+  { id: 'LPG', name: 'Propane (LPG)', icon: 'flame' },
+];
