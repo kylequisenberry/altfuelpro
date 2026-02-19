@@ -3,25 +3,6 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 
-// Platform-specific map components
-let MapView: any = null;
-let Marker: any = null;
-let Circle: any = null;
-let PROVIDER_DEFAULT: any = null;
-
-// Only import react-native-maps on native platforms
-if (Platform.OS !== 'web') {
-  try {
-    const Maps = require('react-native-maps');
-    MapView = Maps.default;
-    Marker = Maps.Marker;
-    Circle = Maps.Circle;
-    PROVIDER_DEFAULT = Maps.PROVIDER_DEFAULT;
-  } catch (e) {
-    console.log('react-native-maps not available');
-  }
-}
-
 interface MapWrapperProps {
   style?: any;
   region?: {
@@ -67,7 +48,7 @@ interface CircleWrapperProps {
 }
 
 // Web fallback component
-const WebMapFallback: React.FC<MapWrapperProps> = ({ style, children, initialRegion, region }) => {
+const WebMapFallback: React.FC<MapWrapperProps> = ({ style, initialRegion, region }) => {
   const displayRegion = region || initialRegion;
   return (
     <View style={[styles.webMapContainer, style]}>
@@ -79,36 +60,53 @@ const WebMapFallback: React.FC<MapWrapperProps> = ({ style, children, initialReg
             {displayRegion.latitude.toFixed(4)}, {displayRegion.longitude.toFixed(4)}
           </Text>
         )}
-        <Text style={styles.webMapNote}>Open in Expo Go for full map</Text>
+        <Text style={styles.webMapNote}>Open in Expo Go for full map experience</Text>
       </View>
-      {children}
     </View>
   );
 };
 
-const WebMarkerFallback: React.FC<MarkerWrapperProps> = () => null;
-const WebCircleFallback: React.FC<CircleWrapperProps> = () => null;
-
 // Export platform-specific components
 export const MapViewComponent: React.FC<MapWrapperProps> = (props) => {
-  if (Platform.OS === 'web' || !MapView) {
+  // Always show web fallback on web platform
+  if (Platform.OS === 'web') {
     return <WebMapFallback {...props} />;
   }
-  return <MapView provider={PROVIDER_DEFAULT} {...props} />;
+  
+  // On native, dynamically require react-native-maps
+  try {
+    const MapView = require('react-native-maps').default;
+    const PROVIDER_DEFAULT = require('react-native-maps').PROVIDER_DEFAULT;
+    return <MapView provider={PROVIDER_DEFAULT} {...props} />;
+  } catch (e) {
+    return <WebMapFallback {...props} />;
+  }
 };
 
 export const MarkerComponent: React.FC<MarkerWrapperProps> = (props) => {
-  if (Platform.OS === 'web' || !Marker) {
-    return <WebMarkerFallback {...props} />;
+  if (Platform.OS === 'web') {
+    return null;
   }
-  return <Marker {...props} />;
+  
+  try {
+    const { Marker } = require('react-native-maps');
+    return <Marker {...props} />;
+  } catch (e) {
+    return null;
+  }
 };
 
 export const CircleComponent: React.FC<CircleWrapperProps> = (props) => {
-  if (Platform.OS === 'web' || !Circle) {
-    return <WebCircleFallback {...props} />;
+  if (Platform.OS === 'web') {
+    return null;
   }
-  return <Circle {...props} />;
+  
+  try {
+    const { Circle } = require('react-native-maps');
+    return <Circle {...props} />;
+  } catch (e) {
+    return null;
+  }
 };
 
 const styles = StyleSheet.create({
