@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { FuelStation, Regulation, ServiceCenter, Inspector, UserProfile, FuelType } from '../types';
+import { FuelStation, Regulation, ServiceCenter, Inspector, UserProfile, FuelType, FuelSystemProvider, InspectorLookupLinks } from '../types';
 
 // API_BASE uses environment variable or falls back to relative path (same origin)
 // This works for both development and production deployments
@@ -7,26 +7,50 @@ const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
 const api = axios.create({
   baseURL: `${API_BASE}/api`,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Fuel Stations
+// Fuel Stations (AFDC API Integration)
 export const getStations = async (filters?: {
   fuel_type?: string;
   state?: string;
   city?: string;
-  status?: string;
+  zip_code?: string;
+  latitude?: number;
+  longitude?: number;
+  radius?: number;
+  limit?: number;
 }): Promise<FuelStation[]> => {
   const params = new URLSearchParams();
   if (filters?.fuel_type) params.append('fuel_type', filters.fuel_type);
   if (filters?.state) params.append('state', filters.state);
   if (filters?.city) params.append('city', filters.city);
-  if (filters?.status) params.append('status', filters.status);
+  if (filters?.zip_code) params.append('zip_code', filters.zip_code);
+  if (filters?.latitude) params.append('latitude', filters.latitude.toString());
+  if (filters?.longitude) params.append('longitude', filters.longitude.toString());
+  if (filters?.radius) params.append('radius', filters.radius.toString());
+  if (filters?.limit) params.append('limit', filters.limit.toString());
   
   const response = await api.get(`/stations?${params.toString()}`);
+  return response.data;
+};
+
+export const getNearbyStations = async (
+  latitude: number,
+  longitude: number,
+  radius?: number,
+  fuelType?: string
+): Promise<FuelStation[]> => {
+  const params = new URLSearchParams();
+  params.append('latitude', latitude.toString());
+  params.append('longitude', longitude.toString());
+  if (radius) params.append('radius', radius.toString());
+  if (fuelType) params.append('fuel_type', fuelType);
+  
+  const response = await api.get(`/stations/nearby?${params.toString()}`);
   return response.data;
 };
 
