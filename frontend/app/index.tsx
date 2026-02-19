@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { MapViewComponent, MarkerComponent } from '../src/components/MapWrapper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStations } from '../src/services/api';
 import { FuelStation } from '../src/types';
