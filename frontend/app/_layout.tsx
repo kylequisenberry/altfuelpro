@@ -29,7 +29,7 @@ export default function TabLayout() {
           paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '500',
         },
         headerStyle: {
@@ -68,6 +68,16 @@ export default function TabLayout() {
           headerTitle: 'Service Centers',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="construct" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="providers"
+        options={{
+          title: 'Providers',
+          headerTitle: 'Fuel System Providers',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="business" size={size} color={color} />
           ),
         }}
       />
@@ -117,6 +127,13 @@ export default function TabLayout() {
         options={{
           href: null,
           headerTitle: 'Inspector Details',
+        }}
+      />
+      <Tabs.Screen
+        name="provider/[id]"
+        options={{
+          href: null,
+          headerTitle: 'Provider Details',
         }}
       />
     </Tabs>
