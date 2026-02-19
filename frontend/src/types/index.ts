@@ -12,9 +12,13 @@ export interface FuelStation {
   hours?: string;
   amenities: string[];
   card_accepted: string[];
-  last_updated: string;
+  last_updated?: string;
   status: string;
   prices?: Record<string, number>;
+  network?: string;
+  access_type?: string;
+  ev_connector_types?: string[];
+  ev_network?: string;
 }
 
 export interface Regulation {
