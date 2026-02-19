@@ -190,9 +190,8 @@ export default function InspectorDetailScreen() {
             
             {/* Map */}
             <View style={styles.mapContainer}>
-              <MapView
+              <MapViewComponent
                 style={styles.map}
-                provider={PROVIDER_DEFAULT}
                 initialRegion={{
                   latitude: inspector.latitude,
                   longitude: inspector.longitude,
@@ -202,14 +201,14 @@ export default function InspectorDetailScreen() {
                 scrollEnabled={false}
                 zoomEnabled={false}
               >
-                <Marker
+                <MarkerComponent
                   coordinate={{
                     latitude: inspector.latitude,
                     longitude: inspector.longitude,
                   }}
                   pinColor={COLORS.primary}
                 />
-                <Circle
+                <CircleComponent
                   center={{
                     latitude: inspector.latitude,
                     longitude: inspector.longitude,
@@ -219,7 +218,7 @@ export default function InspectorDetailScreen() {
                   strokeColor={COLORS.primary}
                   strokeWidth={2}
                 />
-              </MapView>
+              </MapViewComponent>
             </View>
             
             <View style={styles.serviceAreaList}>
