@@ -22,7 +22,7 @@ db = client[os.environ['DB_NAME']]
 
 # AFDC/NREL API Configuration
 NREL_API_KEY = os.environ.get('NREL_API_KEY', '')
-NREL_BASE_URL = "https://developer.nrel.gov/alt-fuel-stations/v1"
+NREL_BASE_URL = "https://developer.nrel.gov/api/alt-fuel-stations/v1"
 
 # Create the main app without a prefix
 app = FastAPI(title="FuelPoint Navigator API")
