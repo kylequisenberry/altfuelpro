@@ -162,16 +162,15 @@ export default function StationsScreen() {
       {/* Map View */}
       {viewMode === 'map' && (
         <View style={styles.mapContainer}>
-          <MapView
+          <MapViewComponent
             style={styles.map}
-            provider={PROVIDER_DEFAULT}
             region={mapRegion}
             onRegionChangeComplete={setMapRegion}
             showsUserLocation
             showsMyLocationButton
           >
             {filteredStations.map((station) => (
-              <Marker
+              <MarkerComponent
                 key={station.id}
                 coordinate={{
                   latitude: station.latitude,
@@ -183,7 +182,7 @@ export default function StationsScreen() {
                 onCalloutPress={() => navigateToStation(station.id)}
               />
             ))}
-          </MapView>
+          </MapViewComponent>
           
           {/* Station Count Badge */}
           <View style={styles.countBadge}>
