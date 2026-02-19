@@ -94,9 +94,8 @@ export default function ServiceCenterDetailScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Map Section */}
       <View style={styles.mapContainer}>
-        <MapView
+        <MapViewComponent
           style={styles.map}
-          provider={PROVIDER_DEFAULT}
           initialRegion={{
             latitude: center.latitude,
             longitude: center.longitude,
@@ -106,14 +105,14 @@ export default function ServiceCenterDetailScreen() {
           scrollEnabled={false}
           zoomEnabled={false}
         >
-          <Marker
+          <MarkerComponent
             coordinate={{
               latitude: center.latitude,
               longitude: center.longitude,
             }}
             pinColor={COLORS.primary}
           />
-        </MapView>
+        </MapViewComponent>
       </View>
 
       <View style={styles.content}>
