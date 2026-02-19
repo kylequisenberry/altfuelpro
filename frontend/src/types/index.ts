@@ -90,4 +90,36 @@ export interface FuelType {
   id: string;
   name: string;
   icon: string;
+  afdc_code?: string;
+}
+
+export interface FuelSystemProvider {
+  id: string;
+  name: string;
+  logo_url?: string;
+  description: string;
+  fuel_types: string[];
+  website: string;
+  support_url?: string;
+  documentation_url?: string;
+  phone?: string;
+  email?: string;
+  headquarters?: string;
+  products: string[];
+  formerly_known_as?: string;
+}
+
+export interface InspectorLookupLinks {
+  afvi: {
+    name: string;
+    description: string;
+    url: string;
+    certifications: string[];
+  };
+  csa: {
+    name: string;
+    description: string;
+    url: string;
+    certifications: string[];
+  };
 }
