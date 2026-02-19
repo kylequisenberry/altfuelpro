@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
+import { MapViewComponent, MarkerComponent, CircleComponent } from '../../src/components/MapWrapper';
 import { getInspector } from '../../src/services/api';
 import { Inspector } from '../../src/types';
 import { FuelTypeChip } from '../../src/components/FuelTypeChip';
