@@ -1,298 +1,344 @@
 #!/usr/bin/env python3
-"""
-Comprehensive Backend API Tests for FuelPoint Navigator
-Tests all endpoints with proper filtering and validation
-"""
+
 import requests
 import json
 import sys
-from datetime import datetime
+from typing import Dict, Any, List
 
-# Base URL from frontend environment
+# Backend URL from the review request
 BASE_URL = "https://inspector-hub-6.preview.emergentagent.com/api"
 
-# Colors for output
-class Colors:
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    BOLD = '\033[1m'
-    END = '\033[0m'
-
 class APITester:
-    def __init__(self):
-        self.total_tests = 0
-        self.passed_tests = 0
-        self.failed_tests = 0
-        self.test_results = []
-    
-    def log(self, message, level="INFO"):
-        """Log message with color coding"""
-        color = {
-            "PASS": Colors.GREEN,
-            "FAIL": Colors.RED,
-            "WARN": Colors.YELLOW,
-            "INFO": Colors.BLUE
-        }.get(level, Colors.BLUE)
-        print(f"{color}{level}: {message}{Colors.END}")
-    
-    def test_endpoint(self, endpoint, expected_status=200, method="GET", data=None, description=""):
-        """Generic endpoint tester"""
-        self.total_tests += 1
-        url = f"{BASE_URL}{endpoint}"
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.results = []
+        self.session = requests.Session()
+        self.session.timeout = 30
+        
+    def test_endpoint(self, method: str, endpoint: str, params: dict = None, expected_status: int = 200, description: str = ""):
+        """Test an API endpoint and record results"""
+        url = f"{self.base_url}{endpoint}"
         
         try:
-            if method == "GET":
-                response = requests.get(url, timeout=30)
-            elif method == "POST":
-                response = requests.post(url, json=data, timeout=30)
-            elif method == "PUT":
-                response = requests.put(url, json=data, timeout=30)
-            elif method == "DELETE":
-                response = requests.delete(url, timeout=30)
+            if method.upper() == "GET":
+                response = self.session.get(url, params=params)
+            elif method.upper() == "POST":
+                response = self.session.post(url, json=params)
+            elif method.upper() == "PUT":
+                response = self.session.put(url, json=params)
+            elif method.upper() == "DELETE":
+                response = self.session.delete(url)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
             
-            if response.status_code == expected_status:
-                self.passed_tests += 1
-                self.log(f"✅ {method} {endpoint} - {description}", "PASS")
-                return response.json() if response.content else {}
+            success = response.status_code == expected_status
+            
+            result = {
+                "method": method.upper(),
+                "endpoint": endpoint,
+                "params": params,
+                "expected_status": expected_status,
+                "actual_status": response.status_code,
+                "success": success,
+                "description": description,
+                "response_size": len(response.text),
+                "error": None
+            }
+            
+            if success:
+                try:
+                    result["data"] = response.json()
+                except:
+                    result["data"] = response.text[:200] + "..." if len(response.text) > 200 else response.text
             else:
-                self.failed_tests += 1
-                self.log(f"❌ {method} {endpoint} - Expected {expected_status}, got {response.status_code}", "FAIL")
-                self.log(f"Response: {response.text[:500]}", "FAIL")
-                return None
+                result["error"] = f"Status {response.status_code}: {response.text[:200]}"
                 
+        except requests.exceptions.RequestException as e:
+            result = {
+                "method": method.upper(),
+                "endpoint": endpoint,
+                "params": params,
+                "expected_status": expected_status,
+                "actual_status": "ERROR",
+                "success": False,
+                "description": description,
+                "response_size": 0,
+                "error": str(e)
+            }
         except Exception as e:
-            self.failed_tests += 1
-            self.log(f"❌ {method} {endpoint} - Exception: {str(e)}", "FAIL")
-            return None
+            result = {
+                "method": method.upper(),
+                "endpoint": endpoint,
+                "params": params,
+                "expected_status": expected_status,
+                "actual_status": "EXCEPTION",
+                "success": False,
+                "description": description,
+                "response_size": 0,
+                "error": str(e)
+            }
+        
+        self.results.append(result)
+        return result
     
-    def validate_response_count(self, response, expected_count, description):
-        """Validate response array length"""
-        if response and isinstance(response, list):
-            actual_count = len(response)
-            if actual_count == expected_count:
-                self.log(f"✅ {description} - Got {actual_count} items as expected", "PASS")
-                return True
-            else:
-                self.log(f"❌ {description} - Expected {expected_count}, got {actual_count}", "FAIL")
-                return False
-        else:
-            self.log(f"❌ {description} - Invalid response format", "FAIL")
-            return False
-    
-    def validate_filter_result(self, response, filter_field, filter_value, description):
-        """Validate that all items in response match the filter"""
-        if not response or not isinstance(response, list):
-            self.log(f"❌ {description} - Invalid response", "FAIL")
-            return False
-        
-        for item in response:
-            if filter_field == "fuel_types" or filter_field == "fuel_specializations":
-                # For array fields, check if filter_value is in the array
-                if filter_value not in item.get(filter_field, []):
-                    self.log(f"❌ {description} - Item {item.get('id', 'unknown')} doesn't match filter", "FAIL")
-                    return False
-            else:
-                # For string fields, exact match
-                if item.get(filter_field) != filter_value:
-                    self.log(f"❌ {description} - Item {item.get('id', 'unknown')} doesn't match filter", "FAIL")
-                    return False
-        
-        self.log(f"✅ {description} - All {len(response)} items match filter", "PASS")
-        return True
-    
-    def test_health_and_utility(self):
-        """Test health check and utility endpoints"""
-        self.log("\n" + "="*60, "INFO")
-        self.log("TESTING HEALTH & UTILITY ENDPOINTS", "INFO")
-        self.log("="*60, "INFO")
-        
-        # Health check
-        self.test_endpoint("/health", description="Health check")
-        
-        # Fuel types
-        fuel_types = self.test_endpoint("/fuel-types", description="Get fuel types")
-        if fuel_types:
-            self.validate_response_count(fuel_types, 7, "Fuel types count validation")
-    
-    def test_fuel_stations(self):
-        """Test all fuel station endpoints"""
-        self.log("\n" + "="*60, "INFO")
-        self.log("TESTING FUEL STATION ENDPOINTS", "INFO") 
-        self.log("="*60, "INFO")
-        
-        # Get all stations
-        stations = self.test_endpoint("/stations", description="Get all stations")
-        if stations:
-            self.validate_response_count(stations, 8, "All stations count validation")
-        
-        # Filter by CNG fuel type
-        cng_stations = self.test_endpoint("/stations?fuel_type=CNG", description="Filter by CNG fuel type")
-        if cng_stations:
-            self.validate_filter_result(cng_stations, "fuel_types", "CNG", "CNG filter validation")
-        
-        # Filter by Hydrogen fuel type
-        hydrogen_stations = self.test_endpoint("/stations?fuel_type=Hydrogen", description="Filter by Hydrogen fuel type")
-        if hydrogen_stations:
-            self.validate_filter_result(hydrogen_stations, "fuel_types", "Hydrogen", "Hydrogen filter validation")
-        
-        # Filter by California state
-        ca_stations = self.test_endpoint("/stations?state=CA", description="Filter by California state")
-        if ca_stations:
-            self.validate_filter_result(ca_stations, "state", "CA", "California state filter validation")
-        
-        # Get single station
-        self.test_endpoint("/stations/station-001", description="Get single station details")
-        
-        # Test non-existent station
-        self.test_endpoint("/stations/non-existent", expected_status=404, description="Non-existent station (should fail)")
-    
-    def test_regulations(self):
-        """Test all regulation endpoints"""
-        self.log("\n" + "="*60, "INFO")
-        self.log("TESTING REGULATION ENDPOINTS", "INFO")
-        self.log("="*60, "INFO")
-        
-        # Get all regulations
-        regulations = self.test_endpoint("/regulations", description="Get all regulations")
-        if regulations:
-            self.validate_response_count(regulations, 8, "All regulations count validation")
-        
-        # Filter by Safety category
-        safety_regs = self.test_endpoint("/regulations?category=Safety", description="Filter by Safety category")
-        if safety_regs:
-            self.validate_filter_result(safety_regs, "category", "Safety", "Safety category filter validation")
-        
-        # Filter by Federal jurisdiction
-        federal_regs = self.test_endpoint("/regulations?jurisdiction=Federal", description="Filter by Federal jurisdiction")
-        if federal_regs:
-            self.validate_filter_result(federal_regs, "jurisdiction", "Federal", "Federal jurisdiction filter validation")
-        
-        # Get single regulation
-        self.test_endpoint("/regulations/reg-001", description="Get single regulation details")
-        
-        # Test non-existent regulation
-        self.test_endpoint("/regulations/non-existent", expected_status=404, description="Non-existent regulation (should fail)")
-    
-    def test_service_centers(self):
-        """Test all service center endpoints"""
-        self.log("\n" + "="*60, "INFO")
-        self.log("TESTING SERVICE CENTER ENDPOINTS", "INFO")
-        self.log("="*60, "INFO")
-        
-        # Get all service centers
-        centers = self.test_endpoint("/service-centers", description="Get all service centers")
-        if centers:
-            self.validate_response_count(centers, 5, "All service centers count validation")
-        
-        # Filter by CNG specialization
-        cng_centers = self.test_endpoint("/service-centers?fuel_type=CNG", description="Filter by CNG specialization")
-        if cng_centers:
-            self.validate_filter_result(cng_centers, "fuel_specializations", "CNG", "CNG specialization filter validation")
-        
-        # Filter by Mobile service type
-        mobile_centers = self.test_endpoint("/service-centers?service_type=Mobile", description="Filter by Mobile service type")
-        if mobile_centers:
-            self.validate_filter_result(mobile_centers, "service_type", "Mobile", "Mobile service type filter validation")
-        
-        # Get single service center
-        self.test_endpoint("/service-centers/service-001", description="Get single service center")
-        
-        # Test non-existent service center
-        self.test_endpoint("/service-centers/non-existent", expected_status=404, description="Non-existent service center (should fail)")
-    
-    def test_inspectors(self):
-        """Test all inspector endpoints"""
-        self.log("\n" + "="*60, "INFO")
-        self.log("TESTING INSPECTOR ENDPOINTS", "INFO")
-        self.log("="*60, "INFO")
-        
-        # Get all inspectors
-        inspectors = self.test_endpoint("/inspectors", description="Get all inspectors")
-        if inspectors:
-            self.validate_response_count(inspectors, 5, "All inspectors count validation")
-        
-        # Filter by Hydrogen specialization
-        hydrogen_inspectors = self.test_endpoint("/inspectors?fuel_type=Hydrogen", description="Filter by Hydrogen specialization")
-        if hydrogen_inspectors:
-            self.validate_filter_result(hydrogen_inspectors, "fuel_specializations", "Hydrogen", "Hydrogen specialization filter validation")
-        
-        # Filter by California state
-        ca_inspectors = self.test_endpoint("/inspectors?state=CA", description="Filter by California state")
-        if ca_inspectors:
-            self.validate_filter_result(ca_inspectors, "state", "CA", "California inspector filter validation")
-        
-        # Get single inspector
-        self.test_endpoint("/inspectors/inspector-001", description="Get single inspector details")
-        
-        # Test non-existent inspector
-        self.test_endpoint("/inspectors/non-existent", expected_status=404, description="Non-existent inspector (should fail)")
-    
-    def test_user_profile(self):
-        """Test user profile endpoints"""
-        self.log("\n" + "="*60, "INFO")
-        self.log("TESTING USER PROFILE ENDPOINTS", "INFO")
-        self.log("="*60, "INFO")
-        
-        # Get profile (creates default if not exists)
-        profile = self.test_endpoint("/profile", description="Get user profile")
-        
-        # Update profile
-        update_data = {
-            "name": "Test User",
-            "email": "test@example.com"
+    def validate_afdc_data(self, stations_data: List[Dict]) -> Dict[str, Any]:
+        """Validate that AFDC data is real and not empty"""
+        validation = {
+            "has_data": len(stations_data) > 0,
+            "count": len(stations_data),
+            "has_real_afdc_ids": False,
+            "has_coordinates": False,
+            "has_fuel_types": False,
+            "sample_station": None
         }
-        updated_profile = self.test_endpoint("/profile", method="PUT", data=update_data, description="Update profile")
         
-        if updated_profile:
-            if updated_profile.get("name") == "Test User" and updated_profile.get("email") == "test@example.com":
-                self.log("✅ Profile update validation - Name and email updated correctly", "PASS")
-            else:
-                self.log("❌ Profile update validation - Values not updated correctly", "FAIL")
+        if stations_data:
+            sample = stations_data[0]
+            validation["sample_station"] = {
+                "id": sample.get("id"),
+                "name": sample.get("name"),
+                "fuel_types": sample.get("fuel_types")
+            }
+            
+            # Check for AFDC IDs (should start with "afdc-")
+            validation["has_real_afdc_ids"] = any(
+                station.get("id", "").startswith("afdc-") for station in stations_data
+            )
+            
+            # Check for valid coordinates
+            validation["has_coordinates"] = any(
+                station.get("latitude") and station.get("longitude")
+                for station in stations_data
+            )
+            
+            # Check for fuel types
+            validation["has_fuel_types"] = any(
+                station.get("fuel_types") for station in stations_data
+            )
         
-        # Add station to favorites
-        self.test_endpoint("/profile/favorites/station-001", method="POST", description="Add station to favorites")
-        
-        # Remove station from favorites
-        self.test_endpoint("/profile/favorites/station-001", method="DELETE", description="Remove station from favorites")
+        return validation
     
     def run_all_tests(self):
-        """Run all test suites"""
-        self.log(f"\n{Colors.BOLD}🚀 STARTING FUELPOINT NAVIGATOR API TESTS{Colors.END}", "INFO")
-        self.log(f"Base URL: {BASE_URL}", "INFO")
-        self.log(f"Test started at: {datetime.now().isoformat()}", "INFO")
+        """Run all the tests specified in the review request"""
         
-        # Run all test suites
-        self.test_health_and_utility()
-        self.test_fuel_stations()
-        self.test_regulations()
-        self.test_service_centers()
-        self.test_inspectors()
-        self.test_user_profile()
+        print("🚀 Starting FuelPoint Navigator Backend API Tests")
+        print(f"📍 Testing against: {self.base_url}")
+        print("=" * 80)
         
-        # Print final results
-        self.log("\n" + "="*60, "INFO")
-        self.log(f"{Colors.BOLD}FINAL TEST RESULTS{Colors.END}", "INFO")
-        self.log("="*60, "INFO")
-        self.log(f"Total Tests: {self.total_tests}", "INFO")
-        self.log(f"Passed: {self.passed_tests}", "PASS")
-        self.log(f"Failed: {self.failed_tests}", "FAIL")
-        
-        success_rate = (self.passed_tests / self.total_tests * 100) if self.total_tests > 0 else 0
-        self.log(f"Success Rate: {success_rate:.1f}%", "INFO")
-        
-        if self.failed_tests == 0:
-            self.log(f"\n🎉 ALL TESTS PASSED! 🎉", "PASS")
-            return True
+        # 1. Health Check
+        print("\n🏥 Testing Health Check...")
+        health_result = self.test_endpoint("GET", "/health", description="Health check endpoint")
+        if health_result["success"]:
+            health_data = health_result.get("data", {})
+            print(f"✅ Health check passed - Status: {health_data.get('status')}, AFDC Enabled: {health_data.get('afdc_enabled')}")
         else:
-            self.log(f"\n⚠️  {self.failed_tests} TESTS FAILED", "FAIL")
-            return False
+            print(f"❌ Health check failed: {health_result.get('error')}")
+        
+        # 2. Fuel Types
+        print("\n⛽ Testing Fuel Types...")
+        fuel_types_result = self.test_endpoint("GET", "/fuel-types", description="Fuel types list")
+        if fuel_types_result["success"]:
+            fuel_types = fuel_types_result.get("data", [])
+            print(f"✅ Fuel types retrieved - Count: {len(fuel_types)}")
+            if fuel_types:
+                print(f"   Sample fuel types: {', '.join([ft.get('name', '') for ft in fuel_types[:3]])}")
+        else:
+            print(f"❌ Fuel types failed: {fuel_types_result.get('error')}")
+        
+        # 3. Stations - No filters (should return real AFDC data)
+        print("\n🚉 Testing Stations (No Filters)...")
+        stations_result = self.test_endpoint("GET", "/stations", description="All stations from AFDC API")
+        if stations_result["success"]:
+            stations_data = stations_result.get("data", [])
+            validation = self.validate_afdc_data(stations_data)
+            print(f"✅ Stations retrieved - Count: {validation['count']}")
+            print(f"   Real AFDC IDs: {validation['has_real_afdc_ids']}")
+            print(f"   Has coordinates: {validation['has_coordinates']}")
+            print(f"   Has fuel types: {validation['has_fuel_types']}")
+            if validation["sample_station"]:
+                sample = validation["sample_station"]
+                print(f"   Sample: {sample['name']} ({sample['id']}) - {sample['fuel_types']}")
+        else:
+            print(f"❌ Stations failed: {stations_result.get('error')}")
+        
+        # 4. Stations with Electric filter
+        print("\n🔌 Testing Stations (Electric Filter)...")
+        electric_result = self.test_endpoint("GET", "/stations", {"fuel_type": "Electric"}, description="Electric stations only")
+        if electric_result["success"]:
+            electric_stations = electric_result.get("data", [])
+            print(f"✅ Electric stations retrieved - Count: {len(electric_stations)}")
+            if electric_stations:
+                sample = electric_stations[0]
+                print(f"   Sample: {sample.get('name')} - Fuel types: {sample.get('fuel_types')}")
+        else:
+            print(f"❌ Electric stations failed: {electric_result.get('error')}")
+        
+        # 5. Stations with State filter
+        print("\n🏛️ Testing Stations (CA State Filter)...")
+        ca_result = self.test_endpoint("GET", "/stations", {"state": "CA"}, description="California stations only")
+        if ca_result["success"]:
+            ca_stations = ca_result.get("data", [])
+            print(f"✅ CA stations retrieved - Count: {len(ca_stations)}")
+            if ca_stations:
+                sample = ca_stations[0]
+                print(f"   Sample: {sample.get('name')} in {sample.get('city')}, {sample.get('state')}")
+        else:
+            print(f"❌ CA stations failed: {ca_result.get('error')}")
+        
+        # 6. Nearby Stations (Los Angeles coordinates)
+        print("\n📍 Testing Nearby Stations...")
+        nearby_result = self.test_endpoint("GET", "/stations/nearby", 
+                                         {"latitude": 34.0522, "longitude": -118.2437, "radius": 25},
+                                         description="Stations near Los Angeles")
+        if nearby_result["success"]:
+            nearby_stations = nearby_result.get("data", [])
+            print(f"✅ Nearby stations retrieved - Count: {len(nearby_stations)}")
+            if nearby_stations:
+                sample = nearby_stations[0]
+                print(f"   Sample: {sample.get('name')} at {sample.get('latitude')}, {sample.get('longitude')}")
+        else:
+            print(f"❌ Nearby stations failed: {nearby_result.get('error')}")
+        
+        # 7. Regulations
+        print("\n📋 Testing Regulations...")
+        regs_result = self.test_endpoint("GET", "/regulations", description="Regulations list")
+        if regs_result["success"]:
+            regulations = regs_result.get("data", [])
+            print(f"✅ Regulations retrieved - Count: {len(regulations)}")
+            if regulations:
+                sample = regulations[0]
+                print(f"   Sample: {sample.get('title')} ({sample.get('jurisdiction')})")
+        else:
+            print(f"❌ Regulations failed: {regs_result.get('error')}")
+        
+        # 8. Service Centers
+        print("\n🔧 Testing Service Centers...")
+        centers_result = self.test_endpoint("GET", "/service-centers", description="Service centers list")
+        if centers_result["success"]:
+            centers = centers_result.get("data", [])
+            print(f"✅ Service centers retrieved - Count: {len(centers)}")
+            if centers:
+                sample = centers[0]
+                print(f"   Sample: {sample.get('name')} - Specializations: {sample.get('fuel_specializations')}")
+        else:
+            print(f"❌ Service centers failed: {centers_result.get('error')}")
+        
+        # 9. Inspectors
+        print("\n🔍 Testing Inspectors...")
+        inspectors_result = self.test_endpoint("GET", "/inspectors", description="Inspectors list")
+        if inspectors_result["success"]:
+            inspectors = inspectors_result.get("data", [])
+            print(f"✅ Inspectors retrieved - Count: {len(inspectors)}")
+            if inspectors:
+                sample = inspectors[0]
+                print(f"   Sample: {sample.get('name')} - Specializations: {sample.get('fuel_specializations')}")
+        else:
+            print(f"❌ Inspectors failed: {inspectors_result.get('error')}")
+        
+        # 10. Inspector Lookup Links
+        print("\n🔗 Testing Inspector Lookup Links...")
+        links_result = self.test_endpoint("GET", "/inspector-lookup-links", description="AFVi and CSA lookup links")
+        if links_result["success"]:
+            links = links_result.get("data", {})
+            afvi_present = "afvi" in links
+            csa_present = "csa" in links
+            print(f"✅ Inspector lookup links retrieved")
+            print(f"   AFVi link present: {afvi_present}")
+            print(f"   CSA link present: {csa_present}")
+            if afvi_present:
+                print(f"   AFVi URL: {links['afvi'].get('url')}")
+            if csa_present:
+                print(f"   CSA URL: {links['csa'].get('url')}")
+        else:
+            print(f"❌ Inspector lookup links failed: {links_result.get('error')}")
+        
+        # 11. Providers (All 15 expected)
+        print("\n🏭 Testing Fuel System Providers...")
+        providers_result = self.test_endpoint("GET", "/providers", description="All 15 fuel system providers")
+        if providers_result["success"]:
+            providers = providers_result.get("data", [])
+            print(f"✅ Providers retrieved - Count: {len(providers)} (Expected: 15)")
+            if providers:
+                names = [p.get('name', 'Unknown') for p in providers[:5]]
+                print(f"   Sample providers: {', '.join(names)}")
+        else:
+            print(f"❌ Providers failed: {providers_result.get('error')}")
+        
+        # 12. Providers with CNG filter
+        print("\n🏭 Testing Providers (CNG Filter)...")
+        cng_providers_result = self.test_endpoint("GET", "/providers", {"fuel_type": "CNG"}, description="CNG providers only")
+        if cng_providers_result["success"]:
+            cng_providers = cng_providers_result.get("data", [])
+            print(f"✅ CNG providers retrieved - Count: {len(cng_providers)}")
+            if cng_providers:
+                sample = cng_providers[0]
+                print(f"   Sample: {sample.get('name')} - Fuel types: {sample.get('fuel_types')}")
+        else:
+            print(f"❌ CNG providers failed: {cng_providers_result.get('error')}")
+        
+        # 13. Providers with Cummins search
+        print("\n🔍 Testing Providers (Cummins Search)...")
+        cummins_result = self.test_endpoint("GET", "/providers", {"search": "Cummins"}, description="Search for Cummins")
+        if cummins_result["success"]:
+            cummins_providers = cummins_result.get("data", [])
+            print(f"✅ Cummins search retrieved - Count: {len(cummins_providers)}")
+            if cummins_providers:
+                sample = cummins_providers[0]
+                print(f"   Found: {sample.get('name')} - {sample.get('description')[:100]}...")
+        else:
+            print(f"❌ Cummins search failed: {cummins_result.get('error')}")
+        
+        # 14. Specific Provider (Hexagon Agility)
+        print("\n🎯 Testing Specific Provider (provider-001)...")
+        hexagon_result = self.test_endpoint("GET", "/providers/provider-001", description="Hexagon Agility details")
+        if hexagon_result["success"]:
+            hexagon = hexagon_result.get("data", {})
+            print(f"✅ Hexagon Agility retrieved")
+            print(f"   Name: {hexagon.get('name')}")
+            print(f"   Headquarters: {hexagon.get('headquarters')}")
+            print(f"   Fuel types: {hexagon.get('fuel_types')}")
+        else:
+            print(f"❌ Hexagon Agility failed: {hexagon_result.get('error')}")
+        
+        # Summary
+        self.print_summary()
+    
+    def print_summary(self):
+        """Print test summary"""
+        print("\n" + "=" * 80)
+        print("📊 TEST SUMMARY")
+        print("=" * 80)
+        
+        total_tests = len(self.results)
+        passed_tests = sum(1 for r in self.results if r["success"])
+        failed_tests = total_tests - passed_tests
+        
+        print(f"Total Tests: {total_tests}")
+        print(f"✅ Passed: {passed_tests}")
+        print(f"❌ Failed: {failed_tests}")
+        print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
+        
+        if failed_tests > 0:
+            print("\n🚨 FAILED TESTS:")
+            for result in self.results:
+                if not result["success"]:
+                    print(f"   ❌ {result['method']} {result['endpoint']} - {result.get('error', 'Unknown error')}")
+        
+        print("\n🔍 DETAILED RESULTS:")
+        for result in self.results:
+            status_icon = "✅" if result["success"] else "❌"
+            print(f"   {status_icon} {result['method']} {result['endpoint']} - Status: {result['actual_status']}")
+            if result.get("description"):
+                print(f"      {result['description']}")
 
 def main():
-    tester = APITester()
-    success = tester.run_all_tests()
-    sys.exit(0 if success else 1)
+    """Main test runner"""
+    tester = APITester(BASE_URL)
+    tester.run_all_tests()
+    
+    # Return exit code based on results
+    failed_tests = sum(1 for r in tester.results if not r["success"])
+    sys.exit(1 if failed_tests > 0 else 0)
 
 if __name__ == "__main__":
     main()
