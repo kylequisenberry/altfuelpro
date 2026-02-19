@@ -148,4 +148,28 @@ export const getFuelTypes = async (): Promise<FuelType[]> => {
   return response.data;
 };
 
+// Fuel System Providers
+export const getProviders = async (filters?: {
+  fuel_type?: string;
+  search?: string;
+}): Promise<FuelSystemProvider[]> => {
+  const params = new URLSearchParams();
+  if (filters?.fuel_type) params.append('fuel_type', filters.fuel_type);
+  if (filters?.search) params.append('search', filters.search);
+  
+  const response = await api.get(`/providers?${params.toString()}`);
+  return response.data;
+};
+
+export const getProvider = async (id: string): Promise<FuelSystemProvider> => {
+  const response = await api.get(`/providers/${id}`);
+  return response.data;
+};
+
+// Inspector Lookup Links
+export const getInspectorLookupLinks = async (): Promise<InspectorLookupLinks> => {
+  const response = await api.get('/inspector-lookup-links');
+  return response.data;
+};
+
 export default api;
