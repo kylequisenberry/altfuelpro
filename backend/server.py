@@ -195,38 +195,53 @@ FUEL_SYSTEM_PROVIDERS = [
     {
         "id": "provider-001",
         "name": "Hexagon Agility",
-        "description": "Leading provider of clean fuel solutions including CNG, RNG, and hydrogen fuel systems for commercial vehicles.",
-        "fuel_types": ["CNG", "LNG", "Hydrogen"],
+        "description": "Leading provider of CNG/RNG fuel systems, FleetCare services, and system installation for commercial vehicles. US Corporate headquarters in Salisbury, NC.",
+        "fuel_types": ["CNG"],
         "website": "https://hexagonagility.com",
         "support_url": "https://hexagonagility.com/support",
         "documentation_url": "https://hexagonagility.com/resources",
+        "phone": "+1 (704) 633-2553",
+        "headquarters": "1010 Corporate Center Drive, Salisbury, NC 28146, USA",
+        "products": ["CNG/RNG Fuel Systems", "FleetCare Services", "System Installation", "Vehicle Integration"],
+        "locations": {
+            "us_corporate": "1010 Corporate Center Drive, Salisbury, NC 28146, USA",
+            "fleetcare_installation": "4995 S Main St, Salisbury, NC 28147, USA"
+        }
+    },
+    {
+        "id": "provider-001b",
+        "name": "Hexagon Purus",
+        "description": "Mobile Pipeline and Type 4 cylinder manufacturing facility. Specializes in hydrogen storage systems and composite pressure vessels for clean energy applications.",
+        "fuel_types": ["CNG", "Hydrogen"],
+        "website": "https://hexagonpurus.com",
+        "support_url": "https://hexagonpurus.com/support",
+        "documentation_url": "https://hexagonpurus.com/resources",
         "phone": "+1 (402) 434-2345",
         "headquarters": "Lincoln, Nebraska, USA",
-        "products": ["CNG Fuel Systems", "Type 4 Cylinders", "LNG Systems", "Hydrogen Storage"]
+        "products": ["Mobile Pipeline Systems", "Type 4 Cylinders", "Hydrogen Storage", "Composite Pressure Vessels"]
     },
     {
         "id": "provider-002",
         "name": "Cummins Clean Fuel Technologies",
         "formerly_known_as": "Momentum Fuel Technologies",
-        "description": "Comprehensive natural gas fuel system solutions for heavy-duty trucking and transit applications.",
-        "fuel_types": ["CNG", "LNG"],
-        "website": "https://www.cummins.com/parts-and-service/fuel-systems",
-        "support_url": "https://www.cummins.com/support",
-        "documentation_url": "https://www.cummins.com/parts-and-service/digital-products-and-services",
-        "phone": "+1 (800) 343-7357",
-        "headquarters": "Columbus, Indiana, USA",
-        "products": ["CNG Fuel Systems", "LNG Systems", "Fuel Storage", "Fuel Delivery Systems"]
+        "description": "Comprehensive CNG and RNG fuel system solutions for heavy-duty trucking and transit applications. Specializes in natural gas fuel systems only.",
+        "fuel_types": ["CNG"],
+        "website": "https://www.cumminscleantech.com",
+        "support_url": "https://www.cumminscleantech.com/support",
+        "documentation_url": "https://www.cumminscleantech.com/resources",
+        "headquarters": "Roanoke, Texas, USA",
+        "products": ["CNG Fuel Systems", "RNG Systems", "Fuel Storage", "Fuel Delivery Systems"]
     },
     {
         "id": "provider-003",
         "name": "Mainstay Fuel Technologies",
-        "description": "Manufacturer of CNG and propane fuel systems for light and medium-duty vehicles.",
+        "formerly_known_as": "Piedmont, SC Operations",
+        "description": "DISCONTINUED - Formerly manufactured CNG and propane fuel systems for light and medium-duty vehicles. Company is no longer in business, but legacy systems remain in the field with limited documentation available.",
         "fuel_types": ["CNG", "LPG"],
         "website": "https://mainstayfuel.com",
-        "support_url": "https://mainstayfuel.com/support",
-        "phone": "+1 (817) 295-0554",
-        "headquarters": "Burleson, Texas, USA",
-        "products": ["CNG Bi-Fuel Systems", "Propane Systems", "Fuel Injectors", "Regulators"]
+        "headquarters": "Piedmont, South Carolina, USA (CLOSED)",
+        "products": ["CNG Bi-Fuel Systems (Legacy)", "Propane Systems (Legacy)", "Fuel Injectors (Legacy)", "Regulators (Legacy)"],
+        "status": "discontinued"
     },
     {
         "id": "provider-004",
@@ -253,14 +268,14 @@ FUEL_SYSTEM_PROVIDERS = [
     },
     {
         "id": "provider-006",
-        "name": "Heil Trailer International",
-        "description": "Manufacturer of tank trailers for petroleum, chemical, food, and alternative fuel transportation.",
-        "fuel_types": ["CNG", "LNG", "LPG"],
-        "website": "https://www.heiltrailer.com",
-        "support_url": "https://www.heiltrailer.com/service-support",
-        "phone": "+1 (423) 899-9100",
-        "headquarters": "Chattanooga, Tennessee, USA",
-        "products": ["LNG Transport Trailers", "CNG Tube Trailers", "Propane Transport"]
+        "name": "Heil Environmental",
+        "description": "Manufacturer of refuse and recycling collection vehicle bodies. Part of Environmental Solutions Group. Contact through heil.com directory for locations and service.",
+        "fuel_types": ["CNG"],
+        "website": "https://www.heil.com",
+        "support_url": "https://www.heil.com/contact",
+        "documentation_url": "https://www.heil.com/resources",
+        "headquarters": "Fort Payne, Alabama, USA",
+        "products": ["CNG Refuse Bodies", "Alternative Fuel Ready Equipment", "Recycling Collection Vehicles"]
     },
     {
         "id": "provider-007",
