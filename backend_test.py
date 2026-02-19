@@ -9,7 +9,7 @@ import sys
 from datetime import datetime
 
 # Base URL from frontend environment
-BASE_URL = "https://green-fuel-map.preview.emergentagent.com/api"
+BASE_URL = "https://inspector-hub-6.preview.emergentagent.com/api"
 
 # Colors for output
 class Colors:
