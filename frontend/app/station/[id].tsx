@@ -93,9 +93,8 @@ export default function StationDetailScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Map Section */}
       <View style={styles.mapContainer}>
-        <MapView
+        <MapViewComponent
           style={styles.map}
-          provider={PROVIDER_DEFAULT}
           initialRegion={{
             latitude: station.latitude,
             longitude: station.longitude,
@@ -105,14 +104,14 @@ export default function StationDetailScreen() {
           scrollEnabled={false}
           zoomEnabled={false}
         >
-          <Marker
+          <MarkerComponent
             coordinate={{
               latitude: station.latitude,
               longitude: station.longitude,
             }}
             pinColor={FUEL_TYPE_COLORS[station.fuel_types[0]] || COLORS.primary}
           />
-        </MapView>
+        </MapViewComponent>
         
         {/* Favorite Button */}
         <TouchableOpacity
