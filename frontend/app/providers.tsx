@@ -67,13 +67,20 @@ export default function ProvidersScreen() {
 
   const renderProviderCard = ({ item }: { item: FuelSystemProvider }) => (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, item.status === 'discontinued' && styles.cardDiscontinued]}
       onPress={() => navigateToProvider(item.id)}
       activeOpacity={0.7}
     >
+      {item.status === 'discontinued' && (
+        <View style={styles.discontinuedBanner}>
+          <Ionicons name="warning" size={14} color="#FFFFFF" />
+          <Text style={styles.discontinuedText}>DISCONTINUED - Legacy Systems Only</Text>
+        </View>
+      )}
+      
       <View style={styles.cardHeader}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="business" size={28} color={COLORS.primary} />
+        <View style={[styles.iconContainer, item.status === 'discontinued' && styles.iconDiscontinued]}>
+          <Ionicons name="business" size={28} color={item.status === 'discontinued' ? COLORS.textSecondary : COLORS.primary} />
         </View>
         <View style={styles.headerInfo}>
           <Text style={styles.name}>{item.name}</Text>
@@ -111,32 +118,36 @@ export default function ProvidersScreen() {
       )}
 
       <View style={styles.cardFooter}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => openWebsite(item.website)}
-        >
-          <Ionicons name="globe-outline" size={16} color={COLORS.primary} />
-          <Text style={styles.actionText}>Website</Text>
-        </TouchableOpacity>
-        
-        {item.support_url && (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => openWebsite(item.support_url!)}
-          >
-            <Ionicons name="help-circle-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.actionText}>Support</Text>
-          </TouchableOpacity>
-        )}
-        
-        {item.phone && (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleCall(item.phone!)}
-          >
-            <Ionicons name="call-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.actionText}>Call</Text>
-          </TouchableOpacity>
+        {item.status !== 'discontinued' && (
+          <>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => openWebsite(item.website)}
+            >
+              <Ionicons name="globe-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.actionText}>Website</Text>
+            </TouchableOpacity>
+            
+            {item.support_url && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => openWebsite(item.support_url!)}
+              >
+                <Ionicons name="help-circle-outline" size={16} color={COLORS.primary} />
+                <Text style={styles.actionText}>Support</Text>
+              </TouchableOpacity>
+            )}
+            
+            {item.phone && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleCall(item.phone!)}
+              >
+                <Ionicons name="call-outline" size={16} color={COLORS.primary} />
+                <Text style={styles.actionText}>Call</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
         
         <TouchableOpacity
