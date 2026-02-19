@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { FuelStation, Regulation, ServiceCenter, Inspector, UserProfile, FuelType } from '../types';
 
-const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+// API_BASE uses environment variable or falls back to relative path (same origin)
+// This works for both development and production deployments
+const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
 const api = axios.create({
   baseURL: `${API_BASE}/api`,
