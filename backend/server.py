@@ -172,6 +172,8 @@ class FuelSystemProvider(BaseModel):
     headquarters: Optional[str] = None
     products: List[str] = []
     formerly_known_as: Optional[str] = None
+    status: Optional[str] = None  # "active", "discontinued", etc.
+    locations: Optional[dict] = None  # Additional location details
 
 # User Profile Models
 class UserProfile(BaseModel):
