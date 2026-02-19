@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getInspectors } from '../src/services/api';
-import { Inspector } from '../src/types';
+import { getInspectors, getInspectorLookupLinks } from '../src/services/api';
+import { Inspector, InspectorLookupLinks } from '../src/types';
 import { FuelTypeChip } from '../src/components/FuelTypeChip';
 import { RatingStars } from '../src/components/RatingStars';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
@@ -23,20 +23,27 @@ const FUEL_FILTERS = ['All', 'CNG', 'LNG', 'Hydrogen', 'Electric', 'Biodiesel'];
 export default function InspectorsScreen() {
   const router = useRouter();
   const [inspectors, setInspectors] = useState<Inspector[]>([]);
+  const [lookupLinks, setLookupLinks] = useState<InspectorLookupLinks | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFuelType, setSelectedFuelType] = useState('All');
+  const [showExternalLinks, setShowExternalLinks] = useState(true);
 
-  const fetchInspectors = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       const filters: any = {};
       if (selectedFuelType !== 'All') filters.fuel_type = selectedFuelType;
       
-      const data = await getInspectors(filters);
-      setInspectors(data);
+      const [inspectorsData, linksData] = await Promise.all([
+        getInspectors(filters),
+        getInspectorLookupLinks()
+      ]);
+      
+      setInspectors(inspectorsData);
+      setLookupLinks(linksData);
     } catch (error) {
-      console.error('Error fetching inspectors:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -44,12 +51,12 @@ export default function InspectorsScreen() {
   }, [selectedFuelType]);
 
   useEffect(() => {
-    fetchInspectors();
-  }, [fetchInspectors]);
+    fetchData();
+  }, [fetchData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchInspectors();
+    fetchData();
   };
 
   const filteredInspectors = inspectors.filter((inspector) =>
@@ -68,6 +75,60 @@ export default function InspectorsScreen() {
 
   const handleEmail = (email: string) => {
     Linking.openURL(`mailto:${email}`);
+  };
+
+  const openExternalLink = (url: string) => {
+    Linking.openURL(url);
+  };
+
+  const renderExternalLinksCard = () => {
+    if (!lookupLinks || !showExternalLinks) return null;
+
+    return (
+      <View style={styles.externalLinksContainer}>
+        <View style={styles.externalLinksHeader}>
+          <Text style={styles.externalLinksTitle}>Find Certified Inspectors</Text>
+          <TouchableOpacity onPress={() => setShowExternalLinks(false)}>
+            <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.externalLinksSubtitle}>
+          Search official certification databases:
+        </Text>
+        
+        <TouchableOpacity
+          style={styles.externalLinkCard}
+          onPress={() => openExternalLink(lookupLinks.afvi.url)}
+        >
+          <View style={[styles.externalLinkIcon, { backgroundColor: '#2E7D32' + '20' }]}>
+            <Ionicons name="shield-checkmark" size={24} color="#2E7D32" />
+          </View>
+          <View style={styles.externalLinkInfo}>
+            <Text style={styles.externalLinkName}>{lookupLinks.afvi.name}</Text>
+            <Text style={styles.externalLinkDesc} numberOfLines={2}>
+              {lookupLinks.afvi.description}
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.externalLinkCard}
+          onPress={() => openExternalLink(lookupLinks.csa.url)}
+        >
+          <View style={[styles.externalLinkIcon, { backgroundColor: '#1976D2' + '20' }]}>
+            <Ionicons name="ribbon" size={24} color="#1976D2" />
+          </View>
+          <View style={styles.externalLinkInfo}>
+            <Text style={styles.externalLinkName}>{lookupLinks.csa.name}</Text>
+            <Text style={styles.externalLinkDesc} numberOfLines={2}>
+              {lookupLinks.csa.description}
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const renderInspectorCard = ({ item }: { item: Inspector }) => (
@@ -171,6 +232,17 @@ export default function InspectorsScreen() {
         )}
       </View>
 
+      {/* External Links Toggle */}
+      {!showExternalLinks && lookupLinks && (
+        <TouchableOpacity
+          style={styles.showLinksButton}
+          onPress={() => setShowExternalLinks(true)}
+        >
+          <Ionicons name="globe-outline" size={16} color={COLORS.primary} />
+          <Text style={styles.showLinksText}>Show AFVi & CSA Lookup</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Fuel Type Filter */}
       <View style={styles.filterSection}>
         <FlatList
@@ -206,6 +278,7 @@ export default function InspectorsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderInspectorCard}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={renderExternalLinksCard}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -217,6 +290,7 @@ export default function InspectorsScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="shield-checkmark-outline" size={48} color={COLORS.textLight} />
             <Text style={styles.emptyText}>No inspectors found</Text>
+            <Text style={styles.emptySubtext}>Try searching AFVi or CSA databases above</Text>
           </View>
         }
       />
@@ -245,6 +319,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     fontSize: 16,
     color: COLORS.text,
+  },
+  showLinksButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary + '15',
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  showLinksText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   filterSection: {
     backgroundColor: COLORS.surface,
@@ -276,6 +366,63 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 12,
+  },
+  externalLinksContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  externalLinksHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  externalLinksTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  externalLinksSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+  },
+  externalLinkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    gap: 12,
+  },
+  externalLinkIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  externalLinkInfo: {
+    flex: 1,
+  },
+  externalLinkName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  externalLinkDesc: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 16,
   },
   card: {
     backgroundColor: COLORS.surface,
@@ -408,5 +555,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
     marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });
