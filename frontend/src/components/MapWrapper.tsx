@@ -8,6 +8,7 @@ let MapView: any = null;
 let Marker: any = null;
 let Circle: any = null;
 let PROVIDER_GOOGLE: any = null;
+let mapsAvailable = false;
 
 if (Platform.OS !== 'web') {
   try {
@@ -16,8 +17,10 @@ if (Platform.OS !== 'web') {
     Marker = RNMaps.Marker;
     Circle = RNMaps.Circle;
     PROVIDER_GOOGLE = RNMaps.PROVIDER_GOOGLE;
+    mapsAvailable = true;
   } catch (e) {
-    console.log('react-native-maps not available');
+    console.log('react-native-maps not available - using fallback');
+    mapsAvailable = false;
   }
 }
 
