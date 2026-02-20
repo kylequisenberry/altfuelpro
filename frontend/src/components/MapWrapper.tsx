@@ -1,28 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
-
-// Conditionally import react-native-maps only on native
-let MapView: any = null;
-let Marker: any = null;
-let Circle: any = null;
-let PROVIDER_GOOGLE: any = null;
-let mapsAvailable = false;
-
-if (Platform.OS !== 'web') {
-  try {
-    const RNMaps = require('react-native-maps');
-    MapView = RNMaps.default;
-    Marker = RNMaps.Marker;
-    Circle = RNMaps.Circle;
-    PROVIDER_GOOGLE = RNMaps.PROVIDER_GOOGLE;
-    mapsAvailable = true;
-  } catch (e) {
-    console.log('react-native-maps not available - using fallback');
-    mapsAvailable = false;
-  }
-}
 
 interface MapWrapperProps {
   style?: any;
@@ -77,7 +56,7 @@ const calculateZoom = (latitudeDelta: number): number => {
 
 // Global map state for web
 let webMapInstance: any = null;
-let webMapMarkers: any[] = [];
+let webMapMarkers: MarkerWrapperProps[] = [];
 
 // Web Map initialization
 const initWebMap = (
@@ -182,25 +161,6 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
     longitudeDelta: 30,
   };
 
-  // NATIVE: Use react-native-maps
-  if (Platform.OS !== 'web' && MapView) {
-    return (
-      <MapView
-        style={style}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-        region={region}
-        initialRegion={initialRegion}
-        onRegionChangeComplete={onRegionChangeComplete}
-        showsUserLocation={showsUserLocation}
-        showsMyLocationButton={showsMyLocationButton}
-        scrollEnabled={scrollEnabled}
-        zoomEnabled={zoomEnabled}
-      >
-        {children}
-      </MapView>
-    );
-  }
-
   // WEB: Use Leaflet
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -258,19 +218,19 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
     }
   }, [region?.latitude, region?.longitude, region?.latitudeDelta]);
 
-  // Loading state for web
+  // WEB: Loading state
   if (Platform.OS === 'web' && !leafletLoaded) {
     return (
-      <View style={[styles.webMapContainer, style]}>
-        <View style={styles.webMapContent}>
+      <View style={[styles.fallbackContainer, style]}>
+        <View style={styles.fallbackContent}>
           <Ionicons name="map" size={48} color={COLORS.primary} />
-          <Text style={styles.webMapText}>Loading Map...</Text>
+          <Text style={styles.fallbackText}>Loading Map...</Text>
         </View>
       </View>
     );
   }
 
-  // Web map container
+  // WEB: Leaflet map container
   if (Platform.OS === 'web') {
     return (
       <View style={[styles.container, style]}>
@@ -280,17 +240,41 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
     );
   }
 
-  // Fallback for native without react-native-maps
+  // NATIVE (iOS/Android): Show fallback with option to open in external maps app
+  const openInMaps = () => {
+    const lat = displayRegion.latitude;
+    const lng = displayRegion.longitude;
+    const url = Platform.OS === 'ios'
+      ? `maps://app?daddr=${lat},${lng}`
+      : `geo:${lat},${lng}?q=${lat},${lng}`;
+    
+    Linking.canOpenURL(url).then(supported => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        // Fallback to Google Maps web
+        Linking.openURL(`https://www.google.com/maps/@${lat},${lng},10z`);
+      }
+    });
+  };
+
   return (
-    <View style={[styles.webMapContainer, style]}>
-      <View style={styles.webMapContent}>
-        <Ionicons name="map" size={48} color={COLORS.primary} />
-        <Text style={styles.webMapText}>Map View</Text>
-        <Text style={styles.webMapCoords}>
+    <View style={[styles.fallbackContainer, style]}>
+      <View style={styles.fallbackContent}>
+        <Ionicons name="map" size={56} color={COLORS.primary} />
+        <Text style={styles.fallbackText}>Map View</Text>
+        <Text style={styles.fallbackCoords}>
           {displayRegion.latitude.toFixed(4)}, {displayRegion.longitude.toFixed(4)}
         </Text>
-        <Text style={styles.webMapNote}>Open in Expo Go for full map experience</Text>
+        <Text style={styles.fallbackNote}>
+          Use the List view to browse stations,{'\n'}or open in your device's Maps app
+        </Text>
+        <TouchableOpacity style={styles.openMapsButton} onPress={openInMaps}>
+          <Ionicons name="navigate" size={18} color="#FFFFFF" />
+          <Text style={styles.openMapsText}>Open in Maps App</Text>
+        </TouchableOpacity>
       </View>
+      {children}
     </View>
   );
 };
@@ -298,22 +282,6 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
 // Marker Component
 export const MarkerComponent: React.FC<MarkerWrapperProps> = (props) => {
   const markerRef = useRef<any>(null);
-  const { coordinate, title, description, pinColor, onCalloutPress, children } = props;
-
-  // NATIVE: Use react-native-maps Marker
-  if (Platform.OS !== 'web' && Marker) {
-    return (
-      <Marker
-        coordinate={coordinate}
-        title={title}
-        description={description}
-        pinColor={pinColor}
-        onCalloutPress={onCalloutPress}
-      >
-        {children}
-      </Marker>
-    );
-  }
 
   // WEB: Add to Leaflet map
   useEffect(() => {
@@ -331,8 +299,9 @@ export const MarkerComponent: React.FC<MarkerWrapperProps> = (props) => {
       }
       webMapMarkers = webMapMarkers.filter(m => m !== props);
     };
-  }, [coordinate.latitude, coordinate.longitude, title, description]);
+  }, [props.coordinate.latitude, props.coordinate.longitude, props.title, props.description]);
 
+  // On native, markers don't render anything (handled by fallback)
   return null;
 };
 
@@ -344,20 +313,6 @@ export const CircleComponent: React.FC<CircleWrapperProps> = ({
   strokeColor = '#2E7D32',
   strokeWidth = 2,
 }) => {
-  // NATIVE: Use react-native-maps Circle
-  if (Platform.OS !== 'web' && Circle) {
-    return (
-      <Circle
-        center={center}
-        radius={radius}
-        fillColor={fillColor}
-        strokeColor={strokeColor}
-        strokeWidth={strokeWidth}
-      />
-    );
-  }
-
-  // WEB: Add to Leaflet map
   useEffect(() => {
     if (Platform.OS !== 'web' || !webMapInstance || typeof window === 'undefined') return;
     
@@ -384,30 +339,47 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
-  webMapContainer: {
+  fallbackContainer: {
     backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
     flex: 1,
   },
-  webMapContent: {
+  fallbackContent: {
     alignItems: 'center',
+    padding: 20,
   },
-  webMapText: {
-    fontSize: 18,
+  fallbackText: {
+    fontSize: 20,
     fontWeight: '600',
     color: COLORS.primary,
-    marginTop: 8,
+    marginTop: 12,
   },
-  webMapCoords: {
-    fontSize: 12,
+  fallbackCoords: {
+    fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: 4,
   },
-  webMapNote: {
-    fontSize: 11,
-    color: COLORS.textLight,
-    marginTop: 8,
-    fontStyle: 'italic',
+  fallbackNote: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 16,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  openMapsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+    gap: 8,
+  },
+  openMapsText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
