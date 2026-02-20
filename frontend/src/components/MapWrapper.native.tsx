@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants';
+import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Platform } from 'react-native';
 
 interface MapWrapperProps {
   style?: any;
@@ -34,6 +33,7 @@ interface MarkerWrapperProps {
   description?: string;
   pinColor?: string;
   onCalloutPress?: () => void;
+  children?: React.ReactNode;
 }
 
 interface CircleWrapperProps {
@@ -47,53 +47,70 @@ interface CircleWrapperProps {
   strokeWidth?: number;
 }
 
-// Web fallback component
-export const MapViewComponent: React.FC<MapWrapperProps> = ({ style, initialRegion, region }) => {
-  const displayRegion = region || initialRegion;
+// Native MapView component using react-native-maps
+export const MapViewComponent: React.FC<MapWrapperProps> = ({
+  style,
+  region,
+  initialRegion,
+  onRegionChangeComplete,
+  showsUserLocation = false,
+  showsMyLocationButton = false,
+  scrollEnabled = true,
+  zoomEnabled = true,
+  children,
+}) => {
   return (
-    <View style={[styles.webMapContainer, style]}>
-      <View style={styles.webMapContent}>
-        <Ionicons name="map" size={48} color={COLORS.primary} />
-        <Text style={styles.webMapText}>Map View</Text>
-        {displayRegion && (
-          <Text style={styles.webMapCoords}>
-            {displayRegion.latitude.toFixed(4)}, {displayRegion.longitude.toFixed(4)}
-          </Text>
-        )}
-        <Text style={styles.webMapNote}>Open in Expo Go for full map experience</Text>
-      </View>
-    </View>
+    <MapView
+      style={style}
+      provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+      region={region}
+      initialRegion={initialRegion}
+      onRegionChangeComplete={onRegionChangeComplete}
+      showsUserLocation={showsUserLocation}
+      showsMyLocationButton={showsMyLocationButton}
+      scrollEnabled={scrollEnabled}
+      zoomEnabled={zoomEnabled}
+    >
+      {children}
+    </MapView>
   );
 };
 
-export const MarkerComponent: React.FC<MarkerWrapperProps> = () => null;
-export const CircleComponent: React.FC<CircleWrapperProps> = () => null;
+export const MarkerComponent: React.FC<MarkerWrapperProps> = ({
+  coordinate,
+  title,
+  description,
+  pinColor,
+  onCalloutPress,
+  children,
+}) => {
+  return (
+    <Marker
+      coordinate={coordinate}
+      title={title}
+      description={description}
+      pinColor={pinColor}
+      onCalloutPress={onCalloutPress}
+    >
+      {children}
+    </Marker>
+  );
+};
 
-const styles = StyleSheet.create({
-  webMapContainer: {
-    backgroundColor: '#E8F5E9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  webMapContent: {
-    alignItems: 'center',
-  },
-  webMapText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginTop: 8,
-  },
-  webMapCoords: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  webMapNote: {
-    fontSize: 11,
-    color: COLORS.textLight,
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-});
+export const CircleComponent: React.FC<CircleWrapperProps> = ({
+  center,
+  radius,
+  fillColor,
+  strokeColor,
+  strokeWidth,
+}) => {
+  return (
+    <Circle
+      center={center}
+      radius={radius}
+      fillColor={fillColor}
+      strokeColor={strokeColor}
+      strokeWidth={strokeWidth}
+    />
+  );
+};
