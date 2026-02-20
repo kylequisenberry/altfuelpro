@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../constants';
 
 interface MapWrapperProps {
   style?: any;
@@ -52,11 +54,11 @@ const calculateZoom = (latitudeDelta: number): number => {
   return Math.min(Math.max(zoom, 1), 18);
 };
 
-// Store markers for the map
-let mapMarkers: MarkerWrapperProps[] = [];
-let mapInstance: any = null;
+// Global map state for web
+let webMapInstance: any = null;
+let webMapMarkers: any[] = [];
 
-// Web MapView component using Leaflet via CDN (loaded in +html.tsx)
+// Web MapView component using Leaflet loaded from CDN
 export const MapViewComponent: React.FC<MapWrapperProps> = ({
   style,
   region,
@@ -66,8 +68,9 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
   zoomEnabled = true,
   children,
 }) => {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
+  const mapContainerRef = useRef<any>(null);
+  const mapInitialized = useRef(false);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
   
   const displayRegion = region || initialRegion || {
     latitude: 39.8283,
@@ -76,86 +79,118 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
     longitudeDelta: 30,
   };
 
+  // Load Leaflet JS from CDN if not already loaded
   useEffect(() => {
-    // Wait for Leaflet to be loaded from CDN
-    const initMap = () => {
-      if (typeof window !== 'undefined' && (window as any).L && mapContainerRef.current && !mapRef.current) {
-        const L = (window as any).L;
-        
-        const zoom = calculateZoom(displayRegion.latitudeDelta);
-        
-        // Initialize map
-        mapRef.current = L.map(mapContainerRef.current, {
-          center: [displayRegion.latitude, displayRegion.longitude],
-          zoom: zoom,
-          scrollWheelZoom: zoomEnabled,
-          dragging: scrollEnabled,
-          zoomControl: zoomEnabled,
-        });
-        
-        mapInstance = mapRef.current;
-
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(mapRef.current);
-
-        // Handle region changes
-        if (onRegionChangeComplete) {
-          mapRef.current.on('moveend', () => {
-            const center = mapRef.current.getCenter();
-            const bounds = mapRef.current.getBounds();
-            const latDelta = bounds.getNorth() - bounds.getSouth();
-            const lngDelta = bounds.getEast() - bounds.getWest();
-            
-            onRegionChangeComplete({
-              latitude: center.lat,
-              longitude: center.lng,
-              latitudeDelta: latDelta,
-              longitudeDelta: lngDelta,
-            });
-          });
-        }
-
-        // Add any pending markers
-        mapMarkers.forEach(marker => {
-          addMarkerToMap(L, mapRef.current, marker);
-        });
+    if (Platform.OS !== 'web') return;
+    
+    const loadLeaflet = () => {
+      // Check if Leaflet is already loaded
+      if (typeof window !== 'undefined' && (window as any).L) {
+        setLeafletLoaded(true);
+        return;
       }
+
+      // Load Leaflet script
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.async = true;
+      script.onload = () => {
+        setLeafletLoaded(true);
+      };
+      document.head.appendChild(script);
     };
 
-    // Check if Leaflet is already loaded
-    if ((window as any).L) {
-      initMap();
-    } else {
-      // Wait for Leaflet to load
-      const checkLeaflet = setInterval(() => {
-        if ((window as any).L) {
-          clearInterval(checkLeaflet);
-          initMap();
-        }
-      }, 100);
+    // Use setTimeout to ensure we're on the client
+    const timeout = setTimeout(loadLeaflet, 100);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // Initialize map when Leaflet is loaded
+  useEffect(() => {
+    if (!leafletLoaded || !mapContainerRef.current || mapInitialized.current) return;
+    if (Platform.OS !== 'web') return;
+    if (typeof window === 'undefined') return;
+
+    const L = (window as any).L;
+    if (!L) return;
+
+    try {
+      const zoom = calculateZoom(displayRegion.latitudeDelta);
       
-      // Cleanup interval after 10 seconds
-      setTimeout(() => clearInterval(checkLeaflet), 10000);
+      // Initialize map
+      webMapInstance = L.map(mapContainerRef.current, {
+        center: [displayRegion.latitude, displayRegion.longitude],
+        zoom: zoom,
+        scrollWheelZoom: zoomEnabled,
+        dragging: scrollEnabled,
+        zoomControl: zoomEnabled,
+      });
+
+      // Add OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(webMapInstance);
+
+      // Handle region changes
+      if (onRegionChangeComplete) {
+        webMapInstance.on('moveend', () => {
+          const center = webMapInstance.getCenter();
+          const bounds = webMapInstance.getBounds();
+          const latDelta = bounds.getNorth() - bounds.getSouth();
+          const lngDelta = bounds.getEast() - bounds.getWest();
+          
+          onRegionChangeComplete({
+            latitude: center.lat,
+            longitude: center.lng,
+            latitudeDelta: latDelta,
+            longitudeDelta: lngDelta,
+          });
+        });
+      }
+
+      mapInitialized.current = true;
+
+      // Add any pending markers
+      webMapMarkers.forEach(marker => {
+        addMarkerToMap(L, webMapInstance, marker);
+      });
+    } catch (e) {
+      console.error('Error initializing map:', e);
     }
 
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        mapInstance = null;
+      if (webMapInstance) {
+        webMapInstance.remove();
+        webMapInstance = null;
+        mapInitialized.current = false;
       }
     };
-  }, []);
+  }, [leafletLoaded, displayRegion.latitude, displayRegion.longitude]);
 
   // Update map view when region changes
   useEffect(() => {
-    if (mapRef.current && region) {
+    if (webMapInstance && region && mapInitialized.current) {
       const zoom = calculateZoom(region.latitudeDelta);
-      mapRef.current.setView([region.latitude, region.longitude], zoom);
+      webMapInstance.setView([region.latitude, region.longitude], zoom);
     }
-  }, [region]);
+  }, [region?.latitude, region?.longitude, region?.latitudeDelta]);
+
+  // Fallback for SSR or if Leaflet hasn't loaded
+  if (Platform.OS !== 'web' || !leafletLoaded) {
+    return (
+      <View style={[styles.webMapContainer, style]}>
+        <View style={styles.webMapContent}>
+          <Ionicons name="map" size={48} color={COLORS.primary} />
+          <Text style={styles.webMapText}>Loading Map...</Text>
+          {displayRegion && (
+            <Text style={styles.webMapCoords}>
+              {displayRegion.latitude.toFixed(4)}, {displayRegion.longitude.toFixed(4)}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, style]}>
@@ -163,12 +198,15 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
         ref={mapContainerRef} 
         style={{ width: '100%', height: '100%' }}
       />
+      {children}
     </View>
   );
 };
 
 // Helper to add marker to map
 const addMarkerToMap = (L: any, map: any, props: MarkerWrapperProps) => {
+  if (!L || !map) return;
+  
   const { coordinate, title, description, pinColor = '#2E7D32', onCalloutPress } = props;
   
   // Create custom icon
@@ -181,7 +219,7 @@ const addMarkerToMap = (L: any, map: any, props: MarkerWrapperProps) => {
   
   const icon = L.divIcon({
     html: iconHtml,
-    className: 'custom-marker',
+    className: 'leaflet-custom-marker',
     iconSize: [24, 36],
     iconAnchor: [12, 36],
     popupAnchor: [0, -36],
@@ -192,33 +230,56 @@ const addMarkerToMap = (L: any, map: any, props: MarkerWrapperProps) => {
 
   if (title || description) {
     const popupContent = `
-      <div style="cursor: pointer;">
-        ${title ? `<strong>${title}</strong>` : ''}
-        ${description ? `<p style="margin: 4px 0 0 0; font-size: 12px;">${description}</p>` : ''}
+      <div style="cursor: pointer; min-width: 150px;">
+        ${title ? `<strong style="font-size: 14px;">${title}</strong>` : ''}
+        ${description ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">${description}</p>` : ''}
       </div>
     `;
     marker.bindPopup(popupContent);
   }
 
   if (onCalloutPress) {
-    marker.on('click', onCalloutPress);
+    marker.on('click', () => {
+      marker.openPopup();
+    });
+    marker.on('popupopen', () => {
+      const popup = marker.getPopup();
+      if (popup) {
+        const container = popup.getElement();
+        if (container) {
+          container.addEventListener('click', onCalloutPress);
+        }
+      }
+    });
   }
+
+  return marker;
 };
 
 // Leaflet Marker component
 export const MarkerComponent: React.FC<MarkerWrapperProps> = (props) => {
+  const markerRef = useRef<any>(null);
+
   useEffect(() => {
-    mapMarkers.push(props);
+    if (Platform.OS !== 'web') return;
+    
+    // Store marker data
+    webMapMarkers.push(props);
     
     // If map is already initialized, add marker directly
-    if (mapInstance && (window as any).L) {
-      addMarkerToMap((window as any).L, mapInstance, props);
+    if (webMapInstance && typeof window !== 'undefined' && (window as any).L) {
+      markerRef.current = addMarkerToMap((window as any).L, webMapInstance, props);
     }
 
     return () => {
-      mapMarkers = mapMarkers.filter(m => m !== props);
+      // Remove marker from map
+      if (markerRef.current && webMapInstance) {
+        webMapInstance.removeLayer(markerRef.current);
+      }
+      // Remove from pending markers
+      webMapMarkers = webMapMarkers.filter(m => m !== props);
     };
-  }, [props.coordinate.latitude, props.coordinate.longitude]);
+  }, [props.coordinate.latitude, props.coordinate.longitude, props.title, props.description]);
 
   return null;
 };
@@ -232,16 +293,25 @@ export const CircleComponent: React.FC<CircleWrapperProps> = ({
   strokeWidth = 2,
 }) => {
   useEffect(() => {
-    if (mapInstance && (window as any).L) {
-      const L = (window as any).L;
-      L.circle([center.latitude, center.longitude], {
-        radius,
-        fillColor,
-        color: strokeColor,
-        weight: strokeWidth,
-      }).addTo(mapInstance);
-    }
-  }, [center, radius]);
+    if (Platform.OS !== 'web') return;
+    if (!webMapInstance || typeof window === 'undefined') return;
+    
+    const L = (window as any).L;
+    if (!L) return;
+    
+    const circle = L.circle([center.latitude, center.longitude], {
+      radius,
+      fillColor,
+      color: strokeColor,
+      weight: strokeWidth,
+    }).addTo(webMapInstance);
+
+    return () => {
+      if (webMapInstance) {
+        webMapInstance.removeLayer(circle);
+      }
+    };
+  }, [center.latitude, center.longitude, radius]);
 
   return null;
 };
@@ -250,5 +320,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     overflow: 'hidden',
+  },
+  webMapContainer: {
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    flex: 1,
+  },
+  webMapContent: {
+    alignItems: 'center',
+  },
+  webMapText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginTop: 8,
+  },
+  webMapCoords: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 4,
   },
 });
