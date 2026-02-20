@@ -1,38 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix for default marker icons in Leaflet with webpack/bundlers
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-L.Marker.prototype.options.icon = DefaultIcon;
-
-// Custom colored marker icons
-const createColoredIcon = (color: string) => {
-  const svgIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
-      <path fill="${color}" stroke="#fff" stroke-width="1" d="M12 0C5.4 0 0 5.4 0 12c0 7.2 12 24 12 24s12-16.8 12-24c0-6.6-5.4-12-12-12z"/>
-      <circle fill="#fff" cx="12" cy="12" r="5"/>
-    </svg>
-  `;
-  return L.divIcon({
-    html: svgIcon,
-    className: 'custom-marker',
-    iconSize: [24, 36],
-    iconAnchor: [12, 36],
-    popupAnchor: [0, -36],
-  });
-};
+import { View, StyleSheet, Platform } from 'react-native';
 
 interface MapWrapperProps {
   style?: any;
@@ -79,53 +46,17 @@ interface CircleWrapperProps {
   strokeWidth?: number;
 }
 
-// Component to handle map region changes
-const MapController: React.FC<{
-  region?: MapWrapperProps['region'];
-  onRegionChangeComplete?: MapWrapperProps['onRegionChangeComplete'];
-}> = ({ region, onRegionChangeComplete }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (region) {
-      map.setView([region.latitude, region.longitude], calculateZoom(region.latitudeDelta));
-    }
-  }, [region, map]);
-
-  useEffect(() => {
-    if (onRegionChangeComplete) {
-      const handleMoveEnd = () => {
-        const center = map.getCenter();
-        const bounds = map.getBounds();
-        const latDelta = bounds.getNorth() - bounds.getSouth();
-        const lngDelta = bounds.getEast() - bounds.getWest();
-        
-        onRegionChangeComplete({
-          latitude: center.lat,
-          longitude: center.lng,
-          latitudeDelta: latDelta,
-          longitudeDelta: lngDelta,
-        });
-      };
-
-      map.on('moveend', handleMoveEnd);
-      return () => {
-        map.off('moveend', handleMoveEnd);
-      };
-    }
-  }, [map, onRegionChangeComplete]);
-
-  return null;
-};
-
 // Convert latitudeDelta to zoom level
 const calculateZoom = (latitudeDelta: number): number => {
-  // Approximate conversion from latitudeDelta to Leaflet zoom level
   const zoom = Math.round(Math.log2(360 / latitudeDelta));
   return Math.min(Math.max(zoom, 1), 18);
 };
 
-// Web MapView component using Leaflet
+// Store markers for the map
+let mapMarkers: MarkerWrapperProps[] = [];
+let mapInstance: any = null;
+
+// Web MapView component using Leaflet via CDN (loaded in +html.tsx)
 export const MapViewComponent: React.FC<MapWrapperProps> = ({
   style,
   region,
@@ -135,6 +66,9 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
   zoomEnabled = true,
   children,
 }) => {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  
   const displayRegion = region || initialRegion || {
     latitude: 39.8283,
     longitude: -98.5795,
@@ -142,63 +76,151 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
     longitudeDelta: 30,
   };
 
-  const zoom = calculateZoom(displayRegion.latitudeDelta);
+  useEffect(() => {
+    // Wait for Leaflet to be loaded from CDN
+    const initMap = () => {
+      if (typeof window !== 'undefined' && (window as any).L && mapContainerRef.current && !mapRef.current) {
+        const L = (window as any).L;
+        
+        const zoom = calculateZoom(displayRegion.latitudeDelta);
+        
+        // Initialize map
+        mapRef.current = L.map(mapContainerRef.current, {
+          center: [displayRegion.latitude, displayRegion.longitude],
+          zoom: zoom,
+          scrollWheelZoom: zoomEnabled,
+          dragging: scrollEnabled,
+          zoomControl: zoomEnabled,
+        });
+        
+        mapInstance = mapRef.current;
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(mapRef.current);
+
+        // Handle region changes
+        if (onRegionChangeComplete) {
+          mapRef.current.on('moveend', () => {
+            const center = mapRef.current.getCenter();
+            const bounds = mapRef.current.getBounds();
+            const latDelta = bounds.getNorth() - bounds.getSouth();
+            const lngDelta = bounds.getEast() - bounds.getWest();
+            
+            onRegionChangeComplete({
+              latitude: center.lat,
+              longitude: center.lng,
+              latitudeDelta: latDelta,
+              longitudeDelta: lngDelta,
+            });
+          });
+        }
+
+        // Add any pending markers
+        mapMarkers.forEach(marker => {
+          addMarkerToMap(L, mapRef.current, marker);
+        });
+      }
+    };
+
+    // Check if Leaflet is already loaded
+    if ((window as any).L) {
+      initMap();
+    } else {
+      // Wait for Leaflet to load
+      const checkLeaflet = setInterval(() => {
+        if ((window as any).L) {
+          clearInterval(checkLeaflet);
+          initMap();
+        }
+      }, 100);
+      
+      // Cleanup interval after 10 seconds
+      setTimeout(() => clearInterval(checkLeaflet), 10000);
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        mapInstance = null;
+      }
+    };
+  }, []);
+
+  // Update map view when region changes
+  useEffect(() => {
+    if (mapRef.current && region) {
+      const zoom = calculateZoom(region.latitudeDelta);
+      mapRef.current.setView([region.latitude, region.longitude], zoom);
+    }
+  }, [region]);
 
   return (
     <View style={[styles.container, style]}>
-      <MapContainer
-        center={[displayRegion.latitude, displayRegion.longitude]}
-        zoom={zoom}
+      <div 
+        ref={mapContainerRef} 
         style={{ width: '100%', height: '100%' }}
-        scrollWheelZoom={zoomEnabled}
-        dragging={scrollEnabled}
-        zoomControl={zoomEnabled}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <MapController region={region} onRegionChangeComplete={onRegionChangeComplete} />
-        {children}
-      </MapContainer>
+      />
     </View>
   );
 };
 
-// Leaflet Marker component
-export const MarkerComponent: React.FC<MarkerWrapperProps> = ({
-  coordinate,
-  title,
-  description,
-  pinColor = '#2E7D32',
-  onCalloutPress,
-  children,
-}) => {
-  const icon = createColoredIcon(pinColor);
+// Helper to add marker to map
+const addMarkerToMap = (L: any, map: any, props: MarkerWrapperProps) => {
+  const { coordinate, title, description, pinColor = '#2E7D32', onCalloutPress } = props;
+  
+  // Create custom icon
+  const iconHtml = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
+      <path fill="${pinColor}" stroke="#fff" stroke-width="1" d="M12 0C5.4 0 0 5.4 0 12c0 7.2 12 24 12 24s12-16.8 12-24c0-6.6-5.4-12-12-12z"/>
+      <circle fill="#fff" cx="12" cy="12" r="5"/>
+    </svg>
+  `;
+  
+  const icon = L.divIcon({
+    html: iconHtml,
+    className: 'custom-marker',
+    iconSize: [24, 36],
+    iconAnchor: [12, 36],
+    popupAnchor: [0, -36],
+  });
 
-  return (
-    <Marker 
-      position={[coordinate.latitude, coordinate.longitude]} 
-      icon={icon}
-      eventHandlers={{
-        click: () => {
-          if (onCalloutPress) {
-            onCalloutPress();
-          }
-        },
-      }}
-    >
-      {(title || description) && (
-        <Popup>
-          <div onClick={onCalloutPress} style={{ cursor: onCalloutPress ? 'pointer' : 'default' }}>
-            {title && <strong>{title}</strong>}
-            {description && <p style={{ margin: '4px 0 0 0', fontSize: '12px' }}>{description}</p>}
-          </div>
-        </Popup>
-      )}
-      {children}
-    </Marker>
-  );
+  const marker = L.marker([coordinate.latitude, coordinate.longitude], { icon })
+    .addTo(map);
+
+  if (title || description) {
+    const popupContent = `
+      <div style="cursor: pointer;">
+        ${title ? `<strong>${title}</strong>` : ''}
+        ${description ? `<p style="margin: 4px 0 0 0; font-size: 12px;">${description}</p>` : ''}
+      </div>
+    `;
+    marker.bindPopup(popupContent);
+  }
+
+  if (onCalloutPress) {
+    marker.on('click', onCalloutPress);
+  }
+};
+
+// Leaflet Marker component
+export const MarkerComponent: React.FC<MarkerWrapperProps> = (props) => {
+  useEffect(() => {
+    mapMarkers.push(props);
+    
+    // If map is already initialized, add marker directly
+    if (mapInstance && (window as any).L) {
+      addMarkerToMap((window as any).L, mapInstance, props);
+    }
+
+    return () => {
+      mapMarkers = mapMarkers.filter(m => m !== props);
+    };
+  }, [props.coordinate.latitude, props.coordinate.longitude]);
+
+  return null;
 };
 
 // Leaflet Circle component
@@ -209,17 +231,19 @@ export const CircleComponent: React.FC<CircleWrapperProps> = ({
   strokeColor = '#2E7D32',
   strokeWidth = 2,
 }) => {
-  return (
-    <Circle
-      center={[center.latitude, center.longitude]}
-      radius={radius}
-      pathOptions={{
+  useEffect(() => {
+    if (mapInstance && (window as any).L) {
+      const L = (window as any).L;
+      L.circle([center.latitude, center.longitude], {
+        radius,
         fillColor,
         color: strokeColor,
         weight: strokeWidth,
-      }}
-    />
-  );
+      }).addTo(mapInstance);
+    }
+  }, [center, radius]);
+
+  return null;
 };
 
 const styles = StyleSheet.create({
