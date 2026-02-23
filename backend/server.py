@@ -3143,12 +3143,17 @@ async def get_service_centers(
     fuel_type: Optional[str] = Query(None, description="Filter by fuel specialization"),
     service_type: Optional[str] = Query(None, description="Filter by service type"),
     state: Optional[str] = Query(None, description="Filter by state"),
-    city: Optional[str] = Query(None, description="Filter by city")
+    city: Optional[str] = Query(None, description="Filter by city"),
+    refresh: bool = Query(False, description="Force refresh from latest data")
 ):
     """Get all service centers with optional filters"""
     count = await db.service_centers.count_documents({})
     
-    if count == 0:
+    # Refresh data if count is less than expected or refresh is requested
+    expected_count = len(MOCK_SERVICE_CENTERS)
+    if count == 0 or count < expected_count or refresh:
+        # Clear existing data and repopulate
+        await db.service_centers.delete_many({})
         for center in MOCK_SERVICE_CENTERS:
             await db.service_centers.insert_one(center)
     
