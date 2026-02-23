@@ -1159,6 +1159,70 @@ async def get_fuel_types():
         {"id": "LPG", "name": "Propane (LPG)", "icon": "flame", "afdc_code": "LPG"}
     ]
 
+# ==================== SUPPORT & FEEDBACK ====================
+
+@api_router.post("/feedback", response_model=Feedback)
+async def submit_feedback(feedback: FeedbackCreate):
+    """Submit user feedback, suggestion, or support request"""
+    feedback_doc = {
+        "id": str(uuid.uuid4()),
+        "type": feedback.type,
+        "subject": feedback.subject,
+        "message": feedback.message,
+        "user_email": feedback.user_email,
+        "user_name": feedback.user_name,
+        "platform": feedback.platform,
+        "app_version": "1.0.0",
+        "status": "new",
+        "created_at": datetime.utcnow(),
+        "updated_at": None
+    }
+    
+    await db.feedback.insert_one(feedback_doc)
+    logger.info(f"New feedback submitted: {feedback.type} - {feedback.subject}")
+    
+    return Feedback(**feedback_doc)
+
+@api_router.get("/feedback", response_model=List[Feedback])
+async def get_all_feedback(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    feedback_type: Optional[str] = Query(None, description="Filter by type")
+):
+    """Get all feedback (admin endpoint)"""
+    query = {}
+    if status:
+        query["status"] = status
+    if feedback_type:
+        query["type"] = feedback_type
+    
+    feedbacks = await db.feedback.find(query).sort("created_at", -1).to_list(1000)
+    return [Feedback(**{**f, "id": f.get("id", str(f.get("_id")))}) for f in feedbacks]
+
+@api_router.get("/feedback/{feedback_id}", response_model=Feedback)
+async def get_feedback(feedback_id: str):
+    """Get specific feedback by ID"""
+    feedback = await db.feedback.find_one({"id": feedback_id})
+    if not feedback:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return Feedback(**{**feedback, "id": feedback.get("id", str(feedback.get("_id")))})
+
+@api_router.get("/feedback/stats/summary")
+async def get_feedback_stats():
+    """Get feedback statistics summary"""
+    total = await db.feedback.count_documents({})
+    new_count = await db.feedback.count_documents({"status": "new"})
+    
+    # Count by type
+    type_counts = {}
+    for ftype in ["suggestion", "support", "bug_report", "feature_request", "general"]:
+        type_counts[ftype] = await db.feedback.count_documents({"type": ftype})
+    
+    return {
+        "total": total,
+        "new": new_count,
+        "by_type": type_counts
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
