@@ -63,6 +63,7 @@ A mobile app named "FuelPoint Navigator" for the Alternative Fuels market with t
 - `GET /api/stations` - Live AFDC fuel station data
 - `GET /api/regulations` - Regulations library
 - `GET /api/service-centers` - 118 service centers (filterable)
+- `GET /api/service-centers/nearby/location` - Nearby service centers with distance (NEW)
 - `GET /api/inspectors` - Certified inspectors
 - `GET /api/providers` - Fuel system providers
 - `POST /api/feedback` - User feedback submission
