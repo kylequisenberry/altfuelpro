@@ -69,8 +69,12 @@ export default function StationDetailScreen() {
 
   const handleDirections = () => {
     if (station) {
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}`;
-      Linking.openURL(url);
+      showNavigationPicker({
+        latitude: station.latitude,
+        longitude: station.longitude,
+        name: station.name,
+        address: `${station.street_address}, ${station.city}, ${station.state} ${station.zip}`,
+      });
     }
   };
 
