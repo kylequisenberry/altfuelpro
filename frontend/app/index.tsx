@@ -16,11 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStations } from '../src/services/api';
 import { FuelStation } from '../src/types';
 import { StationCard } from '../src/components/StationCard';
-import { FilterModal } from '../src/components/FilterModal';
+import { StationsFilterModal, StationFilters } from '../src/components/StationsFilterModal';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
 import { COLORS, FUEL_TYPE_COLORS } from '../src/constants';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function StationsScreen() {
   const router = useRouter();
@@ -30,7 +30,13 @@ export default function StationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [selectedFuelTypes, setSelectedFuelTypes] = useState<string[]>([]);
+  const [filters, setFilters] = useState<StationFilters>({
+    city: '',
+    state: '',
+    zipCode: '',
+    radius: undefined,
+    fuelTypes: [],
+  });
   const [mapRegion, setMapRegion] = useState({
     latitude: 37.0902,
     longitude: -95.7129,
@@ -40,10 +46,25 @@ export default function StationsScreen() {
 
   const fetchStations = useCallback(async () => {
     try {
-      const filters = selectedFuelTypes.length === 1
-        ? { fuel_type: selectedFuelTypes[0] }
-        : undefined;
-      const data = await getStations(filters);
+      const apiFilters: any = {};
+      
+      if (filters.fuelTypes.length === 1) {
+        apiFilters.fuel_type = filters.fuelTypes[0];
+      }
+      if (filters.state) {
+        apiFilters.state = filters.state;
+      }
+      if (filters.city) {
+        apiFilters.city = filters.city;
+      }
+      if (filters.zipCode) {
+        apiFilters.zip_code = filters.zipCode;
+      }
+      if (filters.radius) {
+        apiFilters.radius = filters.radius;
+      }
+      
+      const data = await getStations(Object.keys(apiFilters).length > 0 ? apiFilters : undefined);
       setStations(data);
       
       // Center map on first station if available
@@ -61,7 +82,7 @@ export default function StationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedFuelTypes]);
+  }, [filters]);
 
   useEffect(() => {
     fetchStations();
@@ -72,41 +93,44 @@ export default function StationsScreen() {
     fetchStations();
   };
 
-  const handleFuelTypeToggle = (fuelType: string) => {
-    setSelectedFuelTypes((prev) =>
-      prev.includes(fuelType)
-        ? prev.filter((t) => t !== fuelType)
-        : [...prev, fuelType]
-    );
+  const handleApplyFilters = (newFilters: StationFilters) => {
+    setFilters(newFilters);
   };
 
-  const handleClearFilters = () => {
-    setSelectedFuelTypes([]);
-  };
+  // Filter stations client-side for multiple fuel types
+  const filteredStations = stations.filter((station) => {
+    if (filters.fuelTypes.length > 1) {
+      return station.fuel_types.some((type) => filters.fuelTypes.includes(type));
+    }
+    return true;
+  });
 
-  const filteredStations = selectedFuelTypes.length > 0
-    ? stations.filter((s) =>
-        s.fuel_types.some((type) => selectedFuelTypes.includes(type))
-      )
-    : stations;
-
-  const navigateToStation = (stationId: string) => {
-    router.push(`/station/${stationId}`);
+  const navigateToStation = (id: string) => {
+    router.push(`/station/${id}`);
   };
 
   const getMarkerColor = (fuelTypes: string[]) => {
-    if (fuelTypes.length === 0) return COLORS.textSecondary;
+    if (fuelTypes.length === 0) return COLORS.primary;
     return FUEL_TYPE_COLORS[fuelTypes[0]] || COLORS.primary;
   };
 
+  const activeFilterCount = [
+    filters.city,
+    filters.state,
+    filters.zipCode,
+    filters.radius,
+    filters.fuelTypes.length > 0
+  ].filter(Boolean).length;
+
   if (loading) {
-    return <LoadingSpinner message="Loading stations..." />;
+    return <LoadingSpinner message="Finding fuel stations..." />;
   }
 
   return (
     <View style={styles.container}>
-      {/* View Toggle & Filter Bar */}
-      <View style={styles.controlBar}>
+      {/* Header Controls */}
+      <View style={styles.headerControls}>
+        {/* View Mode Toggle */}
         <View style={styles.viewToggle}>
           <TouchableOpacity
             style={[styles.toggleButton, viewMode === 'map' && styles.toggleButtonActive]}
@@ -117,7 +141,9 @@ export default function StationsScreen() {
               size={18}
               color={viewMode === 'map' ? '#FFFFFF' : COLORS.textSecondary}
             />
-            <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>
+            <Text
+              style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}
+            >
               Map
             </Text>
           </TouchableOpacity>
@@ -130,34 +156,50 @@ export default function StationsScreen() {
               size={18}
               color={viewMode === 'list' ? '#FFFFFF' : COLORS.textSecondary}
             />
-            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
+            <Text
+              style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}
+            >
               List
             </Text>
           </TouchableOpacity>
         </View>
-        
+
+        {/* Filter Button */}
         <TouchableOpacity
-          style={[
-            styles.filterButton,
-            selectedFuelTypes.length > 0 && styles.filterButtonActive,
-          ]}
+          style={styles.filterButton}
           onPress={() => setFilterModalVisible(true)}
         >
-          <Ionicons
-            name="filter"
-            size={18}
-            color={selectedFuelTypes.length > 0 ? '#FFFFFF' : COLORS.primary}
-          />
-          <Text
-            style={[
-              styles.filterText,
-              selectedFuelTypes.length > 0 && styles.filterTextActive,
-            ]}
-          >
-            Filter{selectedFuelTypes.length > 0 ? ` (${selectedFuelTypes.length})` : ''}
-          </Text>
+          <Ionicons name="options" size={18} color={COLORS.primary} />
+          <Text style={styles.filterButtonText}>Filter</Text>
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
+
+      {/* Active Filters Display */}
+      {activeFilterCount > 0 && (
+        <View style={styles.activeFiltersBar}>
+          <Text style={styles.activeFiltersText}>
+            {filters.state && `${filters.state} `}
+            {filters.city && `${filters.city} `}
+            {filters.zipCode && `ZIP: ${filters.zipCode} `}
+            {filters.radius && `within ${filters.radius} mi `}
+            {filters.fuelTypes.length > 0 && `• ${filters.fuelTypes.join(', ')}`}
+          </Text>
+          <TouchableOpacity onPress={() => setFilters({
+            city: '',
+            state: '',
+            zipCode: '',
+            radius: undefined,
+            fuelTypes: [],
+          })}>
+            <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Map View */}
       {viewMode === 'map' && (
@@ -221,6 +263,13 @@ export default function StationsScreen() {
               tintColor={COLORS.primary}
             />
           }
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <Text style={styles.listHeaderText}>
+                {filteredStations.length} station{filteredStations.length !== 1 ? 's' : ''} found
+              </Text>
+            </View>
+          }
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="location-outline" size={48} color={COLORS.textLight} />
@@ -232,12 +281,11 @@ export default function StationsScreen() {
       )}
 
       {/* Filter Modal */}
-      <FilterModal
+      <StationsFilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
-        selectedFuelTypes={selectedFuelTypes}
-        onFuelTypeToggle={handleFuelTypeToggle}
-        onClearFilters={handleClearFilters}
+        filters={filters}
+        onApplyFilters={handleApplyFilters}
       />
     </View>
   );
@@ -248,26 +296,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  controlBar: {
+  headerControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: COLORS.divider,
   },
   viewToggle: {
     flexDirection: 'row',
     backgroundColor: COLORS.background,
     borderRadius: 8,
-    padding: 4,
+    padding: 3,
   },
   toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
     paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 6,
     gap: 4,
   },
@@ -285,23 +334,46 @@ const styles = StyleSheet.create({
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
     paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 8,
+    backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: COLORS.primary,
-    gap: 4,
+    borderColor: COLORS.border,
+    gap: 6,
   },
-  filterButtonActive: {
-    backgroundColor: COLORS.primary,
-  },
-  filterText: {
+  filterButtonText: {
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.primary,
   },
-  filterTextActive: {
+  filterBadge: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 2,
+  },
+  filterBadgeText: {
     color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  activeFiltersBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.primary + '10',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  activeFiltersText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   mapContainer: {
     flex: 1,
@@ -316,10 +388,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -329,11 +401,16 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   listContent: {
-    paddingVertical: 8,
+    padding: 12,
+  },
+  listHeader: {
+    marginBottom: 8,
+  },
+  listHeaderText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
   },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 60,
   },
