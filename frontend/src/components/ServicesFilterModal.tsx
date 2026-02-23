@@ -175,9 +175,9 @@ export const ServicesFilterModal: React.FC<ServicesFilterModalProps> = ({
                           setShowStateDropdown(false);
                         }}
                       >
-                        <Text style={styles.dropdownItemText}>All States</Text>
+                        <Text style={styles.dropdownItemText}>All States/Provinces</Text>
                       </TouchableOpacity>
-                      {US_STATES.map((state) => (
+                      {STATES_AND_PROVINCES.map((state) => (
                         <TouchableOpacity
                           key={state}
                           style={[
