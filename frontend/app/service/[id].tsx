@@ -16,6 +16,8 @@ import { ServiceCenter } from '../../src/types';
 import { FuelTypeChip } from '../../src/components/FuelTypeChip';
 import { RatingStars } from '../../src/components/RatingStars';
 import { LoadingSpinner } from '../../src/components/LoadingSpinner';
+import { NavigationButton } from '../../src/components/NavigationButton';
+import { showNavigationPicker } from '../../src/utils/navigation';
 import { COLORS } from '../../src/constants';
 
 export default function ServiceCenterDetailScreen() {
