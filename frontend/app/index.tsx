@@ -199,6 +199,8 @@ export default function StationsScreen() {
 
   const handleApplyFilters = (newFilters: StationFilters) => {
     setFilters(newFilters);
+    setNearbyMode(false);
+    setUserLocation(null);
   };
 
   // Filter stations client-side for multiple fuel types
