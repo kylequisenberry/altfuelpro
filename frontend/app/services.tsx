@@ -165,22 +165,37 @@ export default function ServicesScreen() {
     filters.serviceType
   ].filter(Boolean).length;
 
-  const renderServiceCard = ({ item }: { item: ServiceCenter }) => (
+  const renderServiceCard = ({ item }: { item: ServiceCenterDisplay }) => (
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigateToServiceCenter(item.id)}
       activeOpacity={0.7}
+      data-testid={`service-card-${item.id}`}
     >
       <View style={styles.cardHeader}>
         <View style={styles.nameRow}>
           <Ionicons name="construct" size={20} color={COLORS.primary} />
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
         </View>
-        <View style={styles.serviceTypeBadge}>
-          <Ionicons name={getServiceTypeIcon(item.service_type)} size={12} color={COLORS.secondary} />
-          <Text style={styles.serviceTypeText}>{item.service_type}</Text>
+        <View style={styles.headerBadges}>
+          {item.distance_miles !== undefined && (
+            <View style={styles.distanceBadge}>
+              <Ionicons name="navigate" size={12} color="#FFFFFF" />
+              <Text style={styles.distanceText}>{item.distance_miles} mi</Text>
+            </View>
+          )}
+          <View style={styles.serviceTypeBadge}>
+            <Ionicons name={getServiceTypeIcon(item.service_type)} size={12} color={COLORS.secondary} />
+            <Text style={styles.serviceTypeText}>{item.service_type}</Text>
+          </View>
         </View>
       </View>
+
+      {item.distance_km !== undefined && (
+        <Text style={styles.distanceSubtext}>
+          {item.distance_km} km away
+        </Text>
+      )}
 
       <Text style={styles.address} numberOfLines={1}>
         {item.address}, {item.city}, {item.state}
