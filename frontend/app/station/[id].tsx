@@ -16,6 +16,7 @@ import { getStation, addFavoriteStation, removeFavoriteStation, getProfile } fro
 import { FuelStation } from '../../src/types';
 import { FuelTypeChip } from '../../src/components/FuelTypeChip';
 import { LoadingSpinner } from '../../src/components/LoadingSpinner';
+import { showNavigationPicker } from '../../src/utils/navigation';
 import { COLORS, STATUS_COLORS, FUEL_TYPE_COLORS } from '../../src/constants';
 
 const { width } = Dimensions.get('window');
