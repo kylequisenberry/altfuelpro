@@ -98,6 +98,31 @@ export const getServiceCenters = async (filters?: {
   return response.data;
 };
 
+export interface ServiceCenterWithDistance extends ServiceCenter {
+  distance_miles: number;
+  distance_km: number;
+}
+
+export const getNearbyServiceCenters = async (
+  latitude: number,
+  longitude: number,
+  radius: number = 25,
+  filters?: {
+    fuel_type?: string;
+    service_type?: string;
+  }
+): Promise<ServiceCenterWithDistance[]> => {
+  const params = new URLSearchParams();
+  params.append('latitude', latitude.toString());
+  params.append('longitude', longitude.toString());
+  params.append('radius', radius.toString());
+  if (filters?.fuel_type) params.append('fuel_type', filters.fuel_type);
+  if (filters?.service_type) params.append('service_type', filters.service_type);
+  
+  const response = await api.get(`/service-centers/nearby/location?${params.toString()}`);
+  return response.data;
+};
+
 export const getServiceCenter = async (id: string): Promise<ServiceCenter> => {
   const response = await api.get(`/service-centers/${id}`);
   return response.data;
