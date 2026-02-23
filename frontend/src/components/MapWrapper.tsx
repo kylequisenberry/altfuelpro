@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
+
+// Import WebView for mobile
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+  WebView = require('react-native-webview').WebView;
+}
 
 interface MapWrapperProps {
   style?: any;
@@ -23,6 +29,16 @@ interface MapWrapperProps {
   scrollEnabled?: boolean;
   zoomEnabled?: boolean;
   children?: React.ReactNode;
+  markers?: MarkerData[];
+}
+
+interface MarkerData {
+  id: string;
+  latitude: number;
+  longitude: number;
+  title?: string;
+  description?: string;
+  pinColor?: string;
 }
 
 interface MarkerWrapperProps {
@@ -54,9 +70,101 @@ const calculateZoom = (latitudeDelta: number): number => {
   return Math.min(Math.max(zoom, 1), 18);
 };
 
-// Global map state for web
+// Global state for web map
 let webMapInstance: any = null;
 let webMapMarkers: MarkerWrapperProps[] = [];
+
+// Generate HTML for WebView map
+const generateMapHtml = (
+  lat: number, 
+  lng: number, 
+  zoom: number, 
+  markers: MarkerData[] = []
+) => {
+  const markersJson = JSON.stringify(markers);
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #map { width: 100%; height: 100%; }
+    .custom-marker { background: none; border: none; }
+    .leaflet-popup-content { min-width: 150px; }
+    .leaflet-popup-content strong { font-size: 14px; color: #212121; }
+    .leaflet-popup-content p { margin: 4px 0 0 0; font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    const map = L.map('map', {
+      center: [${lat}, ${lng}],
+      zoom: ${zoom},
+      zoomControl: true
+    });
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+    
+    const markers = ${markersJson};
+    
+    markers.forEach(m => {
+      const color = m.pinColor || '#2E7D32';
+      const iconHtml = \`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
+          <path fill="\${color}" stroke="#fff" stroke-width="1" d="M12 0C5.4 0 0 5.4 0 12c0 7.2 12 24 12 24s12-16.8 12-24c0-6.6-5.4-12-12-12z"/>
+          <circle fill="#fff" cx="12" cy="12" r="5"/>
+        </svg>
+      \`;
+      
+      const icon = L.divIcon({
+        html: iconHtml,
+        className: 'custom-marker',
+        iconSize: [24, 36],
+        iconAnchor: [12, 36],
+        popupAnchor: [0, -36]
+      });
+      
+      const marker = L.marker([m.latitude, m.longitude], { icon }).addTo(map);
+      
+      if (m.title || m.description) {
+        marker.bindPopup(\`
+          <strong>\${m.title || ''}</strong>
+          \${m.description ? '<p>' + m.description + '</p>' : ''}
+        \`);
+      }
+      
+      marker.on('click', () => {
+        window.ReactNativeWebView?.postMessage(JSON.stringify({
+          type: 'markerClick',
+          id: m.id,
+          title: m.title
+        }));
+      });
+    });
+    
+    map.on('moveend', () => {
+      const center = map.getCenter();
+      const bounds = map.getBounds();
+      window.ReactNativeWebView?.postMessage(JSON.stringify({
+        type: 'regionChange',
+        latitude: center.lat,
+        longitude: center.lng,
+        latitudeDelta: bounds.getNorth() - bounds.getSouth(),
+        longitudeDelta: bounds.getEast() - bounds.getWest()
+      }));
+    });
+  </script>
+</body>
+</html>
+  `;
+};
 
 // Web Map initialization
 const initWebMap = (
@@ -144,11 +252,10 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
   region,
   initialRegion,
   onRegionChangeComplete,
-  showsUserLocation = false,
-  showsMyLocationButton = false,
   scrollEnabled = true,
   zoomEnabled = true,
   children,
+  markers = [],
 }) => {
   const mapContainerRef = useRef<any>(null);
   const mapInitialized = useRef(false);
@@ -161,7 +268,54 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
     longitudeDelta: 30,
   };
 
-  // WEB: Use Leaflet
+  const zoom = calculateZoom(displayRegion.latitudeDelta);
+
+  // NATIVE: Use WebView with embedded Leaflet
+  if (Platform.OS !== 'web' && WebView) {
+    const htmlContent = generateMapHtml(
+      displayRegion.latitude,
+      displayRegion.longitude,
+      zoom,
+      markers
+    );
+
+    const handleMessage = (event: any) => {
+      try {
+        const data = JSON.parse(event.nativeEvent.data);
+        if (data.type === 'regionChange' && onRegionChangeComplete) {
+          onRegionChangeComplete(data);
+        }
+        if (data.type === 'markerClick') {
+          console.log('Marker clicked:', data.id, data.title);
+        }
+      } catch (e) {
+        console.error('Error parsing WebView message:', e);
+      }
+    };
+
+    return (
+      <View style={[styles.container, style]}>
+        <WebView
+          source={{ html: htmlContent }}
+          style={styles.webview}
+          onMessage={handleMessage}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={true}
+          scalesPageToFit={true}
+          renderLoading={() => (
+            <View style={styles.loadingContainer}>
+              <Ionicons name="map" size={48} color={COLORS.primary} />
+              <Text style={styles.loadingText}>Loading Map...</Text>
+            </View>
+          )}
+        />
+        {children}
+      </View>
+    );
+  }
+
+  // WEB: Use Leaflet directly
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     
@@ -221,11 +375,9 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
   // WEB: Loading state
   if (Platform.OS === 'web' && !leafletLoaded) {
     return (
-      <View style={[styles.fallbackContainer, style]}>
-        <View style={styles.fallbackContent}>
-          <Ionicons name="map" size={48} color={COLORS.primary} />
-          <Text style={styles.fallbackText}>Loading Map...</Text>
-        </View>
+      <View style={[styles.loadingContainer, style]}>
+        <Ionicons name="map" size={48} color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading Map...</Text>
       </View>
     );
   }
@@ -240,41 +392,11 @@ export const MapViewComponent: React.FC<MapWrapperProps> = ({
     );
   }
 
-  // NATIVE (iOS/Android): Show fallback with option to open in external maps app
-  const openInMaps = () => {
-    const lat = displayRegion.latitude;
-    const lng = displayRegion.longitude;
-    const url = Platform.OS === 'ios'
-      ? `maps://app?daddr=${lat},${lng}`
-      : `geo:${lat},${lng}?q=${lat},${lng}`;
-    
-    Linking.canOpenURL(url).then(supported => {
-      if (supported) {
-        Linking.openURL(url);
-      } else {
-        // Fallback to Google Maps web
-        Linking.openURL(`https://www.google.com/maps/@${lat},${lng},10z`);
-      }
-    });
-  };
-
+  // Fallback
   return (
-    <View style={[styles.fallbackContainer, style]}>
-      <View style={styles.fallbackContent}>
-        <Ionicons name="map" size={56} color={COLORS.primary} />
-        <Text style={styles.fallbackText}>Map View</Text>
-        <Text style={styles.fallbackCoords}>
-          {displayRegion.latitude.toFixed(4)}, {displayRegion.longitude.toFixed(4)}
-        </Text>
-        <Text style={styles.fallbackNote}>
-          Use the List view to browse stations,{'\n'}or open in your device's Maps app
-        </Text>
-        <TouchableOpacity style={styles.openMapsButton} onPress={openInMaps}>
-          <Ionicons name="navigate" size={18} color="#FFFFFF" />
-          <Text style={styles.openMapsText}>Open in Maps App</Text>
-        </TouchableOpacity>
-      </View>
-      {children}
+    <View style={[styles.loadingContainer, style]}>
+      <Ionicons name="map" size={48} color={COLORS.primary} />
+      <Text style={styles.loadingText}>Map View</Text>
     </View>
   );
 };
@@ -301,7 +423,6 @@ export const MarkerComponent: React.FC<MarkerWrapperProps> = (props) => {
     };
   }, [props.coordinate.latitude, props.coordinate.longitude, props.title, props.description]);
 
-  // On native, markers don't render anything (handled by fallback)
   return null;
 };
 
@@ -339,47 +460,19 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
-  fallbackContainer: {
+  webview: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
     backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
-    flex: 1,
   },
-  fallbackContent: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  fallbackText: {
-    fontSize: 20,
+  loadingText: {
+    fontSize: 16,
     fontWeight: '600',
     color: COLORS.primary,
     marginTop: 12,
-  },
-  fallbackCoords: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  fallbackNote: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 16,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  openMapsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
-    gap: 8,
-  },
-  openMapsText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
 });
