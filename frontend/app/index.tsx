@@ -73,6 +73,81 @@ export default function StationsScreen() {
 
   const { getLocation, clearError } = useLocation();
 
+  const findNearbyStations = useCallback(async () => {
+    setLocationLoading(true);
+    clearError();
+    
+    try {
+      const location = await getLocation();
+      if (!location) {
+        Alert.alert(
+          'Location Required',
+          'Please enable location access to find nearby stations.',
+          [{ text: 'OK' }]
+        );
+        setLocationLoading(false);
+        return;
+      }
+
+      setUserLocation(location);
+
+      // Fetch stations using the AFDC API with location parameters
+      const apiFilters: any = {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        radius: 25, // 25 miles radius
+      };
+      
+      if (filters.fuelTypes.length === 1) {
+        apiFilters.fuel_type = filters.fuelTypes[0];
+      }
+
+      const data = await getStations(apiFilters);
+      
+      // Calculate distances for each station
+      const stationsWithDistance = data.map((station) => {
+        const dist = calculateDistance(
+          location.latitude,
+          location.longitude,
+          station.latitude,
+          station.longitude
+        );
+        return {
+          ...station,
+          distance_miles: dist.miles,
+          distance_km: dist.km,
+        };
+      });
+
+      // Sort by distance
+      stationsWithDistance.sort((a, b) => (a.distance_miles || 0) - (b.distance_miles || 0));
+
+      setStations(stationsWithDistance);
+      setNearbyMode(true);
+      
+      // Center map on user location
+      setMapRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.5,
+        longitudeDelta: 0.5,
+      });
+    } catch (error) {
+      console.error('Error finding nearby stations:', error);
+      Alert.alert('Error', 'Failed to find nearby stations. Please try again.');
+    } finally {
+      setLocationLoading(false);
+      setLoading(false);
+    }
+  }, [getLocation, clearError, filters.fuelTypes]);
+
+  const handleShowAll = () => {
+    setNearbyMode(false);
+    setUserLocation(null);
+    setLoading(true);
+    fetchStations();
+  };
+
   const fetchStations = useCallback(async () => {
     try {
       const apiFilters: any = {};
