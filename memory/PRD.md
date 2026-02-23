@@ -52,6 +52,14 @@ A mobile app named "FuelPoint Navigator" for the Alternative Fuels market with t
   - Backend endpoint: `GET /api/service-centers/nearby/location`
   - Haversine formula for accurate distance calculation
 
+### Phase 5: Turn-by-Turn Navigation (Completed - Feb 23, 2025)
+- **Navigation Integration:**
+  - Added to both Station and Service Center detail pages
+  - Map app picker (Google Maps, Apple Maps on iOS, Waze)
+  - Deep linking to preferred navigation app
+  - Reusable NavigationButton component
+  - Cross-platform support (web opens in new tab, mobile opens native apps)
+
 ## Tech Stack
 - **Frontend:** React Native, Expo, Expo Router, TypeScript
 - **Backend:** Python, FastAPI, Pydantic
