@@ -270,20 +270,54 @@ export default function StationsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Filter Button */}
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setFilterModalVisible(true)}
-        >
-          <Ionicons name="options" size={18} color={COLORS.primary} />
-          <Text style={styles.filterButtonText}>Filter</Text>
-          {activeFilterCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* Nearby and Filter Buttons */}
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[styles.nearbyButton, nearbyMode && styles.nearbyButtonActive]}
+            onPress={nearbyMode ? handleShowAll : findNearbyStations}
+            disabled={locationLoading}
+            data-testid="find-nearest-stations-btn"
+          >
+            {locationLoading ? (
+              <ActivityIndicator size="small" color={nearbyMode ? '#FFFFFF' : COLORS.primary} />
+            ) : (
+              <>
+                <Ionicons 
+                  name={nearbyMode ? "list" : "navigate"} 
+                  size={16} 
+                  color={nearbyMode ? '#FFFFFF' : COLORS.primary} 
+                />
+                <Text style={[styles.nearbyButtonText, nearbyMode && styles.nearbyButtonTextActive]}>
+                  {nearbyMode ? 'Show All' : 'Find Nearest'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setFilterModalVisible(true)}
+            data-testid="filter-stations-btn"
+          >
+            <Ionicons name="options" size={18} color={COLORS.primary} />
+            <Text style={styles.filterButtonText}>Filter</Text>
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Nearby Mode Banner */}
+      {nearbyMode && (
+        <View style={styles.nearbyBanner}>
+          <Ionicons name="location" size={16} color="#FFFFFF" />
+          <Text style={styles.nearbyBannerText}>
+            Showing stations within 25 miles (40 km) of your location
+          </Text>
+        </View>
+      )}
 
       {/* Active Filters Display */}
       {activeFilterCount > 0 && (
