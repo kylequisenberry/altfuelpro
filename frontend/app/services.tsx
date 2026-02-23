@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
   nameRow: {
@@ -490,6 +490,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
     flex: 1,
+  },
+  headerBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  distanceText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  distanceSubtext: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
   },
   serviceTypeBadge: {
     flexDirection: 'row',
