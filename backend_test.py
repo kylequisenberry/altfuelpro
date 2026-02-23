@@ -6,7 +6,7 @@ import sys
 from typing import Dict, Any, List
 
 # Backend URL from the review request
-BASE_URL = "https://inspector-hub-6.preview.emergentagent.com/api"
+BASE_URL = "https://fuel-hub-app.preview.emergentagent.com/api"
 
 class APITester:
     def __init__(self, base_url: str):
