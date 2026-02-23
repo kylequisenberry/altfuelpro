@@ -3179,6 +3179,101 @@ async def get_service_center(center_id: str):
         raise HTTPException(status_code=404, detail="Service center not found")
     return ServiceCenter(**{**center, "id": center.get("id", str(center.get("_id")))})
 
+# Haversine formula for distance calculation
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance between two points using Haversine formula. Returns distance in miles."""
+    R = 3959  # Earth's radius in miles
+    
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    
+    a = math.sin(delta_lat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    
+    return R * c
+
+class ServiceCenterWithDistance(BaseModel):
+    id: str
+    name: str
+    address: str
+    city: str
+    state: str
+    zip_code: str
+    latitude: float
+    longitude: float
+    phone: str
+    email: Optional[str] = None
+    website: Optional[str] = None
+    fuel_specializations: List[str]
+    service_type: ServiceType
+    certifications: List[str] = []
+    rating: float = 0.0
+    review_count: int = 0
+    hours: Optional[str] = None
+    services_offered: List[str] = []
+    distance_miles: float
+    distance_km: float
+
+@api_router.get("/service-centers/nearby/location")
+async def get_nearby_service_centers(
+    latitude: float = Query(..., description="User's latitude"),
+    longitude: float = Query(..., description="User's longitude"),
+    radius: float = Query(25, description="Search radius in miles"),
+    fuel_type: Optional[str] = Query(None, description="Filter by fuel specialization"),
+    service_type: Optional[str] = Query(None, description="Filter by service type"),
+    limit: int = Query(20, le=50, description="Maximum number of results")
+):
+    """Get service centers near a specific location, sorted by distance"""
+    
+    # Ensure service centers are in database
+    count = await db.service_centers.count_documents({})
+    if count < len(MOCK_SERVICE_CENTERS):
+        await db.service_centers.delete_many({})
+        for center in MOCK_SERVICE_CENTERS:
+            await db.service_centers.insert_one(center)
+    
+    # Build query
+    query = {}
+    if fuel_type:
+        query["fuel_specializations"] = fuel_type
+    if service_type:
+        query["service_type"] = service_type
+    
+    # Get all matching service centers
+    centers = await db.service_centers.find(query).to_list(1000)
+    
+    # Calculate distances and filter by radius
+    centers_with_distance = []
+    for center in centers:
+        center_lat = center.get("latitude", 0)
+        center_lon = center.get("longitude", 0)
+        
+        if center_lat and center_lon:
+            distance_miles = haversine_distance(latitude, longitude, center_lat, center_lon)
+            
+            if distance_miles <= radius:
+                distance_km = distance_miles * 1.60934
+                centers_with_distance.append({
+                    **center,
+                    "id": center.get("id", str(center.get("_id"))),
+                    "distance_miles": round(distance_miles, 1),
+                    "distance_km": round(distance_km, 1)
+                })
+    
+    # Sort by distance
+    centers_with_distance.sort(key=lambda x: x["distance_miles"])
+    
+    # Limit results
+    centers_with_distance = centers_with_distance[:limit]
+    
+    # Remove MongoDB _id field if present
+    for center in centers_with_distance:
+        center.pop("_id", None)
+    
+    return centers_with_distance
+
 # ==================== INSPECTORS ====================
 
 @api_router.get("/inspectors", response_model=List[Inspector])
