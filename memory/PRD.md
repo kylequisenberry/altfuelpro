@@ -42,6 +42,16 @@ A mobile app named "FuelPoint Navigator" for the Alternative Fuels market with t
   - Fuel types: CNG (108), LNG (46), Electric (17), Hydrogen (9), LPG (2), Biodiesel (1)
 - **Canadian Province Support:** Filter dropdowns now include Canadian provinces
 
+### Phase 4: Geolocation Feature (Completed - Feb 23, 2025)
+- **"Find Nearest" Feature:**
+  - Added to both Stations and Services tabs
+  - Uses device geolocation (expo-location on mobile, browser geolocation on web)
+  - 25-mile (40 km) default search radius
+  - Distance display in both miles and kilometers
+  - Distance badges on service center cards when in nearby mode
+  - Backend endpoint: `GET /api/service-centers/nearby/location`
+  - Haversine formula for accurate distance calculation
+
 ## Tech Stack
 - **Frontend:** React Native, Expo, Expo Router, TypeScript
 - **Backend:** Python, FastAPI, Pydantic
