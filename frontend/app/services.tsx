@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  TextInput,
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -16,24 +15,42 @@ import { ServiceCenter } from '../src/types';
 import { FuelTypeChip } from '../src/components/FuelTypeChip';
 import { RatingStars } from '../src/components/RatingStars';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
+import { ServicesFilterModal, ServiceFilters } from '../src/components/ServicesFilterModal';
 import { COLORS } from '../src/constants';
-
-const SERVICE_TYPES = ['All', 'In-Shop', 'Mobile', 'Both'];
 
 export default function ServicesScreen() {
   const router = useRouter();
   const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedServiceType, setSelectedServiceType] = useState('All');
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filters, setFilters] = useState<ServiceFilters>({
+    city: '',
+    state: '',
+    zipCode: '',
+    radius: undefined,
+    fuelTypes: [],
+    serviceType: undefined,
+  });
 
   const fetchServiceCenters = useCallback(async () => {
     try {
-      const filters: any = {};
-      if (selectedServiceType !== 'All') filters.service_type = selectedServiceType;
+      const apiFilters: any = {};
       
-      const data = await getServiceCenters(filters);
+      if (filters.serviceType) {
+        apiFilters.service_type = filters.serviceType;
+      }
+      if (filters.state) {
+        apiFilters.state = filters.state;
+      }
+      if (filters.city) {
+        apiFilters.city = filters.city;
+      }
+      if (filters.fuelTypes.length === 1) {
+        apiFilters.fuel_type = filters.fuelTypes[0];
+      }
+      
+      const data = await getServiceCenters(Object.keys(apiFilters).length > 0 ? apiFilters : undefined);
       setServiceCenters(data);
     } catch (error) {
       console.error('Error fetching service centers:', error);
@@ -41,7 +58,7 @@ export default function ServicesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedServiceType]);
+  }, [filters]);
 
   useEffect(() => {
     fetchServiceCenters();
@@ -52,10 +69,17 @@ export default function ServicesScreen() {
     fetchServiceCenters();
   };
 
-  const filteredCenters = serviceCenters.filter((center) =>
-    center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    center.city.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleApplyFilters = (newFilters: ServiceFilters) => {
+    setFilters(newFilters);
+  };
+
+  // Client-side filtering for multiple fuel types
+  const filteredCenters = serviceCenters.filter((center) => {
+    if (filters.fuelTypes.length > 1) {
+      return center.fuel_specializations.some((type) => filters.fuelTypes.includes(type));
+    }
+    return true;
+  });
 
   const navigateToServiceCenter = (id: string) => {
     router.push(`/service/${id}`);
@@ -69,10 +93,19 @@ export default function ServicesScreen() {
     switch (type) {
       case 'Mobile': return 'car';
       case 'In-Shop': return 'business';
-      case 'Both': return 'sync';
+      case 'Both': return 'swap-horizontal';
       default: return 'construct';
     }
   };
+
+  const activeFilterCount = [
+    filters.city,
+    filters.state,
+    filters.zipCode,
+    filters.radius,
+    filters.fuelTypes.length > 0,
+    filters.serviceType
+  ].filter(Boolean).length;
 
   const renderServiceCard = ({ item }: { item: ServiceCenter }) => (
     <TouchableOpacity
@@ -136,56 +169,48 @@ export default function ServicesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={COLORS.textSecondary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search service centers..."
-          placeholderTextColor={COLORS.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
-          </TouchableOpacity>
-        )}
+      {/* Header Controls */}
+      <View style={styles.headerControls}>
+        <Text style={styles.resultCount}>
+          {filteredCenters.length} service center{filteredCenters.length !== 1 ? 's' : ''}
+        </Text>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setFilterModalVisible(true)}
+        >
+          <Ionicons name="options" size={18} color={COLORS.primary} />
+          <Text style={styles.filterButtonText}>Filter</Text>
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* Service Type Filter */}
-      <View style={styles.filterSection}>
-        <FlatList
-          horizontal
-          data={SERVICE_TYPES}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                selectedServiceType === item && styles.filterChipActive,
-              ]}
-              onPress={() => setSelectedServiceType(item)}
-            >
-              <Ionicons
-                name={getServiceTypeIcon(item === 'All' ? 'construct' : item)}
-                size={14}
-                color={selectedServiceType === item ? '#FFFFFF' : COLORS.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.filterChipText,
-                  selectedServiceType === item && styles.filterChipTextActive,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
+      {/* Active Filters Display */}
+      {activeFilterCount > 0 && (
+        <View style={styles.activeFiltersBar}>
+          <Text style={styles.activeFiltersText}>
+            {filters.serviceType && `${filters.serviceType} `}
+            {filters.state && `• ${filters.state} `}
+            {filters.city && `• ${filters.city} `}
+            {filters.zipCode && `• ZIP: ${filters.zipCode} `}
+            {filters.radius && `• within ${filters.radius} mi `}
+            {filters.fuelTypes.length > 0 && `• ${filters.fuelTypes.join(', ')}`}
+          </Text>
+          <TouchableOpacity onPress={() => setFilters({
+            city: '',
+            state: '',
+            zipCode: '',
+            radius: undefined,
+            fuelTypes: [],
+            serviceType: undefined,
+          })}>
+            <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Service Centers List */}
       <FlatList
@@ -204,8 +229,17 @@ export default function ServicesScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="construct-outline" size={48} color={COLORS.textLight} />
             <Text style={styles.emptyText}>No service centers found</Text>
+            <Text style={styles.emptySubtext}>Try adjusting your filters</Text>
           </View>
         }
+      />
+
+      {/* Filter Modal */}
+      <ServicesFilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filters={filters}
+        onApplyFilters={handleApplyFilters}
       />
     </View>
   );
@@ -216,53 +250,63 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  searchContainer: {
+  headerControls: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    margin: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  searchInput: {
-    flex: 1,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  filterSection: {
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
-  filterScroll: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.background,
-    marginRight: 8,
-    gap: 6,
-  },
-  filterChipActive: {
-    backgroundColor: COLORS.primary,
-  },
-  filterChipText: {
+  resultCount: {
     fontSize: 14,
-    fontWeight: '500',
     color: COLORS.textSecondary,
   },
-  filterChipTextActive: {
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 6,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.primary,
+  },
+  filterBadge: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 2,
+  },
+  filterBadgeText: {
     color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  activeFiltersBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.primary + '10',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  activeFiltersText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   listContent: {
     padding: 12,
@@ -377,5 +421,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
     marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 4,
   },
 });
