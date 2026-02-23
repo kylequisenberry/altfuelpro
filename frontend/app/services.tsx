@@ -46,6 +46,44 @@ export default function ServicesScreen() {
 
   const { getLocation, error: locationError, clearError } = useLocation();
 
+  const fetchNearbyServiceCenters = useCallback(async () => {
+    setLocationLoading(true);
+    clearError();
+    
+    try {
+      const location = await getLocation();
+      if (!location) {
+        Alert.alert(
+          'Location Required',
+          'Please enable location access to find nearby service centers.',
+          [{ text: 'OK' }]
+        );
+        setLocationLoading(false);
+        return;
+      }
+
+      const apiFilters: any = {};
+      if (filters.serviceType) apiFilters.service_type = filters.serviceType;
+      if (filters.fuelTypes.length === 1) apiFilters.fuel_type = filters.fuelTypes[0];
+
+      const data = await getNearbyServiceCenters(
+        location.latitude,
+        location.longitude,
+        25, // Default 25 miles radius
+        Object.keys(apiFilters).length > 0 ? apiFilters : undefined
+      );
+      
+      setServiceCenters(data);
+      setNearbyMode(true);
+    } catch (error) {
+      console.error('Error fetching nearby service centers:', error);
+      Alert.alert('Error', 'Failed to find nearby service centers. Please try again.');
+    } finally {
+      setLocationLoading(false);
+      setLoading(false);
+    }
+  }, [getLocation, clearError, filters.serviceType, filters.fuelTypes]);
+
   const fetchServiceCenters = useCallback(async () => {
     try {
       const apiFilters: any = {};
