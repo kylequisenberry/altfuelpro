@@ -15,13 +15,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FUEL_TYPES } from '../constants';
 import { FuelTypeChip } from './FuelTypeChip';
 
-// US States for dropdown
-const US_STATES = [
+// US States and Canadian Provinces for dropdown
+const STATES_AND_PROVINCES = [
+  // US States
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
   'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
   'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
   'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  // Canadian Provinces
+  'AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'
 ];
 
 const RADIUS_OPTIONS = [
