@@ -7,23 +7,34 @@ import {
   TouchableOpacity,
   RefreshControl,
   Linking,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getServiceCenters } from '../src/services/api';
+import { getServiceCenters, getNearbyServiceCenters, ServiceCenterWithDistance } from '../src/services/api';
 import { ServiceCenter } from '../src/types';
 import { FuelTypeChip } from '../src/components/FuelTypeChip';
 import { RatingStars } from '../src/components/RatingStars';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
 import { ServicesFilterModal, ServiceFilters } from '../src/components/ServicesFilterModal';
+import { useLocation } from '../src/hooks/useLocation';
 import { COLORS } from '../src/constants';
+
+// Type for service center with optional distance
+type ServiceCenterDisplay = ServiceCenter & {
+  distance_miles?: number;
+  distance_km?: number;
+};
 
 export default function ServicesScreen() {
   const router = useRouter();
-  const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
+  const [serviceCenters, setServiceCenters] = useState<ServiceCenterDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [nearbyMode, setNearbyMode] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [filters, setFilters] = useState<ServiceFilters>({
     city: '',
     state: '',
@@ -32,6 +43,8 @@ export default function ServicesScreen() {
     fuelTypes: [],
     serviceType: undefined,
   });
+
+  const { getLocation, error: locationError, clearError } = useLocation();
 
   const fetchServiceCenters = useCallback(async () => {
     try {
