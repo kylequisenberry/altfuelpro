@@ -122,6 +122,13 @@ export default function ServicesScreen() {
 
   const handleApplyFilters = (newFilters: ServiceFilters) => {
     setFilters(newFilters);
+    setNearbyMode(false); // Reset nearby mode when applying filters
+  };
+
+  const handleShowAll = () => {
+    setNearbyMode(false);
+    setLoading(true);
+    fetchServiceCenters();
   };
 
   // Client-side filtering for multiple fuel types
