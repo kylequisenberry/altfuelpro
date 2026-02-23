@@ -8,6 +8,8 @@ import {
   RefreshControl,
   Dimensions,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,18 +20,43 @@ import { FuelStation } from '../src/types';
 import { StationCard } from '../src/components/StationCard';
 import { StationsFilterModal, StationFilters } from '../src/components/StationsFilterModal';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
+import { useLocation } from '../src/hooks/useLocation';
 import { COLORS, FUEL_TYPE_COLORS } from '../src/constants';
 
 const { width } = Dimensions.get('window');
 
+// Type for station with optional distance
+type FuelStationDisplay = FuelStation & {
+  distance_miles?: number;
+  distance_km?: number;
+};
+
+// Haversine distance calculation (client-side)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): { miles: number; km: number } => {
+  const R = 3959; // Earth's radius in miles
+  const lat1Rad = (lat1 * Math.PI) / 180;
+  const lat2Rad = (lat2 * Math.PI) / 180;
+  const deltaLat = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLon = ((lon2 - lon1) * Math.PI) / 180;
+  
+  const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(deltaLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
+  const miles = R * c;
+  return { miles: Math.round(miles * 10) / 10, km: Math.round(miles * 1.60934 * 10) / 10 };
+};
+
 export default function StationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [stations, setStations] = useState<FuelStation[]>([]);
+  const [stations, setStations] = useState<FuelStationDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [nearbyMode, setNearbyMode] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [filters, setFilters] = useState<StationFilters>({
     city: '',
     state: '',
@@ -43,6 +70,8 @@ export default function StationsScreen() {
     latitudeDelta: 40,
     longitudeDelta: 40,
   });
+
+  const { getLocation, clearError } = useLocation();
 
   const fetchStations = useCallback(async () => {
     try {
