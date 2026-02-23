@@ -168,8 +168,17 @@ export default function StationsScreen() {
             onRegionChangeComplete={setMapRegion}
             showsUserLocation
             showsMyLocationButton
+            markers={filteredStations.map((station) => ({
+              id: station.id,
+              latitude: station.latitude,
+              longitude: station.longitude,
+              title: station.name,
+              description: `${station.fuel_types.join(', ')} - ${station.status}`,
+              pinColor: getMarkerColor(station.fuel_types),
+            }))}
           >
-            {filteredStations.map((station) => (
+            {/* Markers for web (children approach) */}
+            {Platform.OS === 'web' && filteredStations.map((station) => (
               <MarkerComponent
                 key={station.id}
                 coordinate={{
