@@ -62,8 +62,12 @@ export default function ServiceCenterDetailScreen() {
 
   const handleDirections = () => {
     if (center) {
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${center.latitude},${center.longitude}`;
-      Linking.openURL(url);
+      showNavigationPicker({
+        latitude: center.latitude,
+        longitude: center.longitude,
+        name: center.name,
+        address: `${center.address}, ${center.city}, ${center.state} ${center.zip_code}`,
+      });
     }
   };
 
