@@ -172,4 +172,32 @@ export const getInspectorLookupLinks = async (): Promise<InspectorLookupLinks> =
   return response.data;
 };
 
+// Feedback/Support
+export interface FeedbackCreate {
+  type: 'suggestion' | 'support' | 'bug_report' | 'feature_request' | 'general';
+  subject: string;
+  message: string;
+  user_email?: string;
+  user_name?: string;
+  platform?: string;
+}
+
+export interface Feedback extends FeedbackCreate {
+  id: string;
+  app_version: string;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export const submitFeedback = async (feedback: FeedbackCreate): Promise<Feedback> => {
+  const response = await api.post('/feedback', feedback);
+  return response.data;
+};
+
+export const getFeedbackStats = async () => {
+  const response = await api.get('/feedback/stats/summary');
+  return response.data;
+};
+
 export default api;
