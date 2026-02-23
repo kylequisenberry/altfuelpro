@@ -191,6 +191,35 @@ class UserProfileUpdate(BaseModel):
     phone: Optional[str] = None
     preferred_fuel_types: Optional[List[str]] = None
 
+# Support/Feedback Models
+class FeedbackType(str, Enum):
+    SUGGESTION = "suggestion"
+    SUPPORT = "support"
+    BUG_REPORT = "bug_report"
+    FEATURE_REQUEST = "feature_request"
+    GENERAL = "general"
+
+class Feedback(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    type: FeedbackType
+    subject: str
+    message: str
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+    app_version: str = "1.0.0"
+    platform: Optional[str] = None  # ios, android, web
+    status: str = "new"  # new, in_progress, resolved, closed
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+class FeedbackCreate(BaseModel):
+    type: FeedbackType
+    subject: str
+    message: str
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+    platform: Optional[str] = None
+
 # ==================== FUEL SYSTEM PROVIDERS DATA ====================
 
 FUEL_SYSTEM_PROVIDERS = [
