@@ -471,6 +471,50 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: '#FFFFFF',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  nearbyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    gap: 4,
+    minWidth: 100,
+    justifyContent: 'center',
+  },
+  nearbyButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  nearbyButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  nearbyButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  nearbyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  nearbyBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
