@@ -7,27 +7,38 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  KeyboardAvoidingView,
   Platform,
+  KeyboardAvoidingView,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getProfile, updateProfile } from '../src/services/api';
+import { getProfile, updateProfile, submitFeedback, FeedbackCreate } from '../src/services/api';
 import { UserProfile } from '../src/types';
-import { FuelTypeChip } from '../src/components/FuelTypeChip';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
-import { COLORS } from '../src/constants';
+import { COLORS, FUEL_TYPES } from '../src/constants';
 
-const FUEL_TYPES = ['CNG', 'LNG', 'Hydrogen', 'Electric', 'Diesel', 'Gasoline', 'Biodiesel'];
+const FEEDBACK_TYPES = [
+  { id: 'suggestion', label: 'Suggestion', icon: 'bulb-outline', description: 'Share ideas for improvement' },
+  { id: 'feature_request', label: 'Feature Request', icon: 'add-circle-outline', description: 'Request new features' },
+  { id: 'support', label: 'Support', icon: 'help-circle-outline', description: 'Get help with the app' },
+  { id: 'bug_report', label: 'Bug Report', icon: 'bug-outline', description: 'Report issues or problems' },
+  { id: 'general', label: 'General', icon: 'chatbubble-outline', description: 'Other feedback' },
+];
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [editedEmail, setEditedEmail] = useState('');
-  const [editedPhone, setEditedPhone] = useState('');
-  const [selectedFuelTypes, setSelectedFuelTypes] = useState<string[]>([]);
+  
+  // Support modal state
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [selectedFeedbackType, setSelectedFeedbackType] = useState<string>('suggestion');
+  const [feedbackSubject, setFeedbackSubject] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -39,8 +50,7 @@ export default function ProfileScreen() {
       setProfile(data);
       setEditedName(data.name);
       setEditedEmail(data.email || '');
-      setEditedPhone(data.phone || '');
-      setSelectedFuelTypes(data.preferred_fuel_types);
+      setFeedbackEmail(data.email || '');
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -48,42 +58,56 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSaveProfile = async () => {
     try {
       const updated = await updateProfile({
         name: editedName,
-        email: editedEmail || undefined,
-        phone: editedPhone || undefined,
-        preferred_fuel_types: selectedFuelTypes,
+        email: editedEmail,
       });
       setProfile(updated);
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      Alert.alert('Error', 'Failed to update profile');
+    }
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackSubject.trim() || !feedbackMessage.trim()) {
+      Alert.alert('Missing Information', 'Please fill in both subject and message');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const feedback: FeedbackCreate = {
+        type: selectedFeedbackType as FeedbackCreate['type'],
+        subject: feedbackSubject,
+        message: feedbackMessage,
+        user_email: feedbackEmail || undefined,
+        user_name: profile?.name,
+        platform: Platform.OS,
+      };
+
+      await submitFeedback(feedback);
+      
+      Alert.alert(
+        'Thank You!',
+        'Your feedback has been submitted successfully. We appreciate your input!',
+        [{ text: 'OK', onPress: () => {
+          setShowSupportModal(false);
+          setFeedbackSubject('');
+          setFeedbackMessage('');
+          setSelectedFeedbackType('suggestion');
+        }}]
+      );
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
-  };
-
-  const handleFuelTypeToggle = (fuelType: string) => {
-    setSelectedFuelTypes((prev) =>
-      prev.includes(fuelType)
-        ? prev.filter((t) => t !== fuelType)
-        : [...prev, fuelType]
-    );
-  };
-
-  const handleCancel = () => {
-    if (profile) {
-      setEditedName(profile.name);
-      setEditedEmail(profile.email || '');
-      setEditedPhone(profile.phone || '');
-      setSelectedFuelTypes(profile.preferred_fuel_types);
-    }
-    setEditing(false);
   };
 
   if (loading) {
@@ -91,33 +115,37 @@ export default function ProfileScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
+    <KeyboardAvoidingView 
+      style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            <Ionicons name="person" size={48} color={COLORS.primary} />
+            <Ionicons name="person" size={48} color="#FFFFFF" />
           </View>
-          <Text style={styles.welcomeText}>Welcome to FuelPoint</Text>
-          <Text style={styles.subText}>Manage your profile and preferences</Text>
+          <Text style={styles.userName}>{profile?.name || 'Guest User'}</Text>
+          {profile?.email && (
+            <Text style={styles.userEmail}>{profile.email}</Text>
+          )}
         </View>
 
-        {/* Profile Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Personal Information</Text>
-            {!editing && (
-              <TouchableOpacity onPress={() => setEditing(true)}>
-                <Ionicons name="pencil" size={20} color={COLORS.primary} />
-              </TouchableOpacity>
-            )}
+        {/* Profile Info Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Profile Information</Text>
+            <TouchableOpacity onPress={() => setEditing(!editing)}>
+              <Ionicons 
+                name={editing ? "close" : "pencil"} 
+                size={20} 
+                color={COLORS.primary} 
+              />
+            </TouchableOpacity>
           </View>
 
           {editing ? (
-            <>
+            <View style={styles.editForm}>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Name</Text>
                 <TextInput
@@ -125,10 +153,9 @@ export default function ProfileScreen() {
                   value={editedName}
                   onChangeText={setEditedName}
                   placeholder="Enter your name"
-                  placeholderTextColor={COLORS.textSecondary}
+                  placeholderTextColor={COLORS.textLight}
                 />
               </View>
-
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Email</Text>
                 <TextInput
@@ -136,113 +163,231 @@ export default function ProfileScreen() {
                   value={editedEmail}
                   onChangeText={setEditedEmail}
                   placeholder="Enter your email"
-                  placeholderTextColor={COLORS.textSecondary}
+                  placeholderTextColor={COLORS.textLight}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
               </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editedPhone}
-                  onChangeText={setEditedPhone}
-                  placeholder="Enter your phone"
-                  placeholderTextColor={COLORS.textSecondary}
-                  keyboardType="phone-pad"
-                />
-              </View>
-            </>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <>
-              <View style={styles.infoRow}>
+            <View style={styles.infoList}>
+              <View style={styles.infoItem}>
                 <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.infoLabel}>Name</Text>
-                <Text style={styles.infoValue}>{profile?.name || 'Not set'}</Text>
+                <Text style={styles.infoText}>{profile?.name || 'Not set'}</Text>
               </View>
-
-              <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
                 <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue}>{profile?.email || 'Not set'}</Text>
+                <Text style={styles.infoText}>{profile?.email || 'Not set'}</Text>
               </View>
-
-              <View style={styles.infoRow}>
-                <Ionicons name="call-outline" size={20} color={COLORS.textSecondary} />
-                <Text style={styles.infoLabel}>Phone</Text>
-                <Text style={styles.infoValue}>{profile?.phone || 'Not set'}</Text>
-              </View>
-            </>
+            </View>
           )}
         </View>
 
-        {/* Fuel Preferences Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Fuel Preferences</Text>
-          </View>
-          <Text style={styles.preferenceSubtext}>
-            Select your preferred fuel types to personalize your experience
+        {/* Support Center Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support Center</Text>
+          <Text style={styles.sectionSubtitle}>
+            We'd love to hear from you! Share your feedback, suggestions, or get help.
           </Text>
-          <View style={styles.fuelTypes}>
-            {FUEL_TYPES.map((type) => (
-              <FuelTypeChip
-                key={type}
-                fuelType={type}
-                selected={selectedFuelTypes.includes(type)}
-                onPress={editing ? () => handleFuelTypeToggle(type) : undefined}
-              />
-            ))}
-          </View>
-        </View>
 
-        {/* Quick Stats */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Quick Stats</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Ionicons name="heart" size={24} color={COLORS.error} />
-              <Text style={styles.statNumber}>{profile?.favorite_stations.length || 0}</Text>
-              <Text style={styles.statLabel}>Favorites</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="flash" size={24} color={COLORS.accent} />
-              <Text style={styles.statNumber}>{selectedFuelTypes.length}</Text>
-              <Text style={styles.statLabel}>Fuel Types</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        {editing && (
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
+          <View style={styles.supportOptions}>
+            <TouchableOpacity 
+              style={styles.supportCard}
+              onPress={() => {
+                setSelectedFeedbackType('suggestion');
+                setShowSupportModal(true);
+              }}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <View style={[styles.supportIconContainer, { backgroundColor: '#4CAF50' + '20' }]}>
+                <Ionicons name="bulb" size={24} color="#4CAF50" />
+              </View>
+              <Text style={styles.supportCardTitle}>Suggestion</Text>
+              <Text style={styles.supportCardDesc}>Share improvement ideas</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={saving}
+
+            <TouchableOpacity 
+              style={styles.supportCard}
+              onPress={() => {
+                setSelectedFeedbackType('feature_request');
+                setShowSupportModal(true);
+              }}
             >
-              <Text style={styles.saveButtonText}>
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Text>
+              <View style={[styles.supportIconContainer, { backgroundColor: '#2196F3' + '20' }]}>
+                <Ionicons name="add-circle" size={24} color="#2196F3" />
+              </View>
+              <Text style={styles.supportCardTitle}>Feature Request</Text>
+              <Text style={styles.supportCardDesc}>Request new features</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.supportCard}
+              onPress={() => {
+                setSelectedFeedbackType('support');
+                setShowSupportModal(true);
+              }}
+            >
+              <View style={[styles.supportIconContainer, { backgroundColor: '#FF9800' + '20' }]}>
+                <Ionicons name="help-circle" size={24} color="#FF9800" />
+              </View>
+              <Text style={styles.supportCardTitle}>Get Support</Text>
+              <Text style={styles.supportCardDesc}>Help with app issues</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.supportCard}
+              onPress={() => {
+                setSelectedFeedbackType('bug_report');
+                setShowSupportModal(true);
+              }}
+            >
+              <View style={[styles.supportIconContainer, { backgroundColor: '#F44336' + '20' }]}>
+                <Ionicons name="bug" size={24} color="#F44336" />
+              </View>
+              <Text style={styles.supportCardTitle}>Report Bug</Text>
+              <Text style={styles.supportCardDesc}>Report problems</Text>
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={styles.appName}>FuelPoint Navigator</Text>
-          <Text style={styles.appVersion}>Version 1.0.0</Text>
-          <Text style={styles.appCopyright}>© 2025 FuelPoint Inc.</Text>
+          <TouchableOpacity 
+            style={styles.contactButton}
+            onPress={() => {
+              setSelectedFeedbackType('general');
+              setShowSupportModal(true);
+            }}
+          >
+            <Ionicons name="chatbubbles" size={20} color="#FFFFFF" />
+            <Text style={styles.contactButtonText}>Contact Us</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* App Info Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About FuelPoint Navigator</Text>
+          <View style={styles.aboutInfo}>
+            <Text style={styles.aboutText}>
+              Your one-stop shop for alternative fuels technical information, 
+              documentation, safety, regulations, standards, and service providers.
+            </Text>
+            <View style={styles.versionInfo}>
+              <Text style={styles.versionLabel}>Version</Text>
+              <Text style={styles.versionNumber}>1.0.0</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={showSupportModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowSupportModal(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowSupportModal(false)}>
+              <Ionicons name="close" size={28} color={COLORS.text} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {FEEDBACK_TYPES.find(t => t.id === selectedFeedbackType)?.label || 'Feedback'}
+            </Text>
+            <View style={{ width: 28 }} />
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {/* Feedback Type Selection */}
+            <Text style={styles.modalLabel}>Type of Feedback</Text>
+            <View style={styles.feedbackTypeGrid}>
+              {FEEDBACK_TYPES.map((type) => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.feedbackTypeButton,
+                    selectedFeedbackType === type.id && styles.feedbackTypeButtonActive,
+                  ]}
+                  onPress={() => setSelectedFeedbackType(type.id)}
+                >
+                  <Ionicons 
+                    name={type.icon as any} 
+                    size={20} 
+                    color={selectedFeedbackType === type.id ? '#FFFFFF' : COLORS.textSecondary} 
+                  />
+                  <Text style={[
+                    styles.feedbackTypeText,
+                    selectedFeedbackType === type.id && styles.feedbackTypeTextActive,
+                  ]}>
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Email (Optional) */}
+            <Text style={styles.modalLabel}>Email (optional - for follow-up)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={feedbackEmail}
+              onChangeText={setFeedbackEmail}
+              placeholder="your@email.com"
+              placeholderTextColor={COLORS.textLight}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            {/* Subject */}
+            <Text style={styles.modalLabel}>Subject *</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={feedbackSubject}
+              onChangeText={setFeedbackSubject}
+              placeholder="Brief summary of your feedback"
+              placeholderTextColor={COLORS.textLight}
+              maxLength={100}
+            />
+
+            {/* Message */}
+            <Text style={styles.modalLabel}>Message *</Text>
+            <TextInput
+              style={[styles.modalInput, styles.messageInput]}
+              value={feedbackMessage}
+              onChangeText={setFeedbackMessage}
+              placeholder="Please provide details..."
+              placeholderTextColor={COLORS.textLight}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+              maxLength={1000}
+            />
+            <Text style={styles.charCount}>{feedbackMessage.length}/1000</Text>
+
+            {/* Submit Button */}
+            <TouchableOpacity 
+              style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+              onPress={handleSubmitFeedback}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <Text style={styles.submitButtonText}>Submitting...</Text>
+              ) : (
+                <>
+                  <Ionicons name="send" size={18} color="#FFFFFF" />
+                  <Text style={styles.submitButtonText}>Submit Feedback</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.bottomPadding} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -252,180 +397,264 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  scrollContent: {
-    padding: 16,
-  },
   header: {
+    backgroundColor: COLORS.primary,
+    paddingTop: 20,
+    paddingBottom: 30,
     alignItems: 'center',
-    marginBottom: 24,
   },
   avatarContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.primary + '20',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  welcomeText: {
+  userName: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#FFFFFF',
   },
-  subText: {
+  userEmail: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
   },
-  card: {
+  section: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    marginTop: 12,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  cardHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  cardTitle: {
-    fontSize: 18,
+  sectionTitle: {
+    fontSize: 17,
     fontWeight: '600',
     color: COLORS.text,
   },
-  inputGroup: {
+  sectionSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 4,
     marginBottom: 16,
+    lineHeight: 18,
+  },
+  infoList: {
+    gap: 12,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infoText: {
+    fontSize: 15,
+    color: COLORS.text,
+  },
+  editForm: {
+    gap: 16,
+  },
+  inputGroup: {
+    gap: 6,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: COLORS.textSecondary,
-    marginBottom: 6,
   },
   input: {
     backgroundColor: COLORS.background,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
+    padding: 12,
+    fontSize: 15,
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  infoRow: {
+  saveButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  supportOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  supportCard: {
+    width: '47%',
+    backgroundColor: COLORS.background,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  supportIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  supportCardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  supportCardDesc: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 10,
+    gap: 8,
+  },
+  contactButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  aboutInfo: {
+    marginTop: 8,
+  },
+  aboutText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  versionInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.divider,
+  },
+  versionLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  versionNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  bottomPadding: {
+    height: 40,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
-  infoLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginLeft: 12,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '500',
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: COLORS.text,
   },
-  preferenceSubtext: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginBottom: 12,
+  modalContent: {
+    flex: 1,
+    padding: 16,
   },
-  fuelTypes: {
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  feedbackTypeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  statsRow: {
+  feedbackTypeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    marginTop: 8,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 50,
-    backgroundColor: COLORS.divider,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    gap: 6,
     borderWidth: 1,
     borderColor: COLORS.border,
-    alignItems: 'center',
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  feedbackTypeButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  feedbackTypeText: {
+    fontSize: 13,
     color: COLORS.textSecondary,
   },
-  saveButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    backgroundColor: COLORS.textLight,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  feedbackTypeTextActive: {
     color: '#FFFFFF',
   },
-  appInfo: {
-    alignItems: 'center',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
+  modalInput: {
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 15,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  appName: {
+  messageInput: {
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 10,
+    gap: 8,
+    marginTop: 24,
+  },
+  submitButtonDisabled: {
+    backgroundColor: COLORS.textLight,
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.primary,
-  },
-  appVersion: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  appCopyright: {
-    fontSize: 11,
-    color: COLORS.textLight,
-    marginTop: 4,
   },
 });
