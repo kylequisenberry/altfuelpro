@@ -35,6 +35,10 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [editedEmail, setEditedEmail] = useState('');
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  
+  // Network status
+  const { isOffline } = useNetworkStatus();
   
   // Support modal state
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -46,7 +50,13 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchProfile();
+    loadLastSyncTime();
   }, []);
+  
+  const loadLastSyncTime = async () => {
+    const syncTime = await getLastSyncTime();
+    setLastSyncTime(syncTime);
+  };
 
   const fetchProfile = async () => {
     try {
