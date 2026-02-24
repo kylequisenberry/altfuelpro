@@ -3553,6 +3553,269 @@ async def get_feedback_stats():
         "by_type": type_counts
     }
 
+# ==================== ROUTE PLANNER ENDPOINT ====================
+
+# Helper function to interpolate points along a route
+def interpolate_route_points(lat1: float, lon1: float, lat2: float, lon2: float, num_points: int = 10) -> List[tuple]:
+    """Generate intermediate points along a great circle route"""
+    points = []
+    for i in range(num_points + 1):
+        fraction = i / num_points
+        lat = lat1 + (lat2 - lat1) * fraction
+        lon = lon1 + (lon2 - lon1) * fraction
+        points.append((lat, lon))
+    return points
+
+# Helper function to find stations near a point
+async def find_stations_near_point(lat: float, lon: float, radius_miles: float, fuel_type: str) -> List[dict]:
+    """Find fuel stations near a given point using AFDC API"""
+    try:
+        # Map fuel type to AFDC fuel type code
+        fuel_type_map = {
+            "CNG": "CNG",
+            "LNG": "LNG",
+            "Hydrogen": "HY",
+            "Electric": "ELEC",
+            "E85": "E85",
+            "Biodiesel": "BD",
+            "LPG": "LPG"
+        }
+        afdc_fuel_type = fuel_type_map.get(fuel_type, "CNG")
+        
+        async with httpx.AsyncClient() as client:
+            params = {
+                "api_key": NREL_API_KEY,
+                "latitude": lat,
+                "longitude": lon,
+                "radius": radius_miles,
+                "fuel_type": afdc_fuel_type,
+                "status": "E",  # Available stations only
+                "access": "public",
+                "limit": 20,
+                "format": "json"
+            }
+            response = await client.get(f"{NREL_BASE_URL}.json", params=params)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("fuel_stations", [])
+    except Exception as e:
+        logger.error(f"Error fetching stations near point: {e}")
+    return []
+
+# Estimated average fuel prices per DGE by type
+FUEL_PRICES = {
+    "CNG": 2.50,
+    "LNG": 3.00,
+    "Hydrogen": 16.00,
+    "Electric": 0.40,  # per kWh equivalent
+    "E85": 3.20,
+    "Biodiesel": 4.00,
+    "LPG": 3.50
+}
+
+@api_router.post("/route-planner", response_model=RoutePlan)
+async def plan_route(request: RoutePlanRequest):
+    """
+    Plan a route with optimal fuel stops.
+    
+    This endpoint calculates the best fuel stops along a route based on:
+    - Vehicle fuel capacity and efficiency
+    - Available fuel stations of the specified type
+    - Distance between stops (ensuring you don't run out of fuel)
+    """
+    
+    # Calculate total distance (straight line - real routing would use a directions API)
+    total_distance_miles = haversine_distance(
+        request.origin_lat, request.origin_lng,
+        request.destination_lat, request.destination_lng
+    )
+    total_distance_km = total_distance_miles * 1.60934
+    
+    # Estimate travel time (assuming average speed of 55 mph for trucks)
+    average_speed_mph = 55
+    estimated_hours = total_distance_miles / average_speed_mph
+    
+    # Calculate vehicle range
+    usable_capacity = request.tank_capacity_dge * (1 - request.reserve_percentage / 100)
+    vehicle_range = usable_capacity * request.mpg_dge
+    
+    # Initialize route planning
+    fuel_stops = []
+    segments = []
+    warnings = []
+    
+    # Check if the trip is doable with one tank
+    if total_distance_miles <= vehicle_range:
+        # No fuel stops needed
+        segments.append(RouteSegment(
+            from_location=request.origin_name,
+            to_location=request.destination_name,
+            distance_miles=round(total_distance_miles, 1),
+            distance_km=round(total_distance_km, 1),
+            estimated_time_hours=round(estimated_hours, 2)
+        ))
+        
+        total_fuel_needed = total_distance_miles / request.mpg_dge
+        fuel_price = FUEL_PRICES.get(request.fuel_type, 3.00)
+        
+        return RoutePlan(
+            origin=RouteLocation(
+                name=request.origin_name,
+                latitude=request.origin_lat,
+                longitude=request.origin_lng
+            ),
+            destination=RouteLocation(
+                name=request.destination_name,
+                latitude=request.destination_lat,
+                longitude=request.destination_lng
+            ),
+            total_distance_miles=round(total_distance_miles, 1),
+            total_distance_km=round(total_distance_km, 1),
+            estimated_total_time_hours=round(estimated_hours, 2),
+            fuel_stops=[],
+            segments=segments,
+            total_fuel_needed_dge=round(total_fuel_needed, 1),
+            estimated_fuel_cost=round(total_fuel_needed * fuel_price, 2),
+            vehicle_settings=VehicleSettings(
+                fuel_type=request.fuel_type,
+                tank_capacity_dge=request.tank_capacity_dge,
+                mpg_dge=request.mpg_dge,
+                reserve_percentage=request.reserve_percentage
+            ),
+            warnings=["No fuel stops needed - trip is within vehicle range."]
+        )
+    
+    # For longer trips, find fuel stops along the route
+    # Generate waypoints along the route
+    num_segments = max(3, int(total_distance_miles / (vehicle_range * 0.7)))  # 70% of range between stops
+    route_points = interpolate_route_points(
+        request.origin_lat, request.origin_lng,
+        request.destination_lat, request.destination_lng,
+        num_segments
+    )
+    
+    # Find stations near each waypoint
+    current_lat = request.origin_lat
+    current_lng = request.origin_lng
+    current_location_name = request.origin_name
+    distance_from_start = 0
+    distance_since_last_stop = 0
+    
+    for i, (waypoint_lat, waypoint_lng) in enumerate(route_points[1:-1], 1):
+        # Calculate distance to this waypoint
+        segment_distance = haversine_distance(current_lat, current_lng, waypoint_lat, waypoint_lng)
+        distance_from_start += segment_distance
+        distance_since_last_stop += segment_distance
+        
+        # Check if we need a fuel stop before this waypoint
+        if distance_since_last_stop >= vehicle_range * 0.7:
+            # Find stations near this waypoint
+            search_radius = 30  # miles
+            stations = await find_stations_near_point(
+                waypoint_lat, waypoint_lng, search_radius, request.fuel_type
+            )
+            
+            if stations:
+                # Pick the best station (closest to the route)
+                best_station = stations[0]
+                for station in stations:
+                    station_dist = haversine_distance(
+                        waypoint_lat, waypoint_lng,
+                        station.get("latitude", 0), station.get("longitude", 0)
+                    )
+                    best_dist = haversine_distance(
+                        waypoint_lat, waypoint_lng,
+                        best_station.get("latitude", 0), best_station.get("longitude", 0)
+                    )
+                    if station_dist < best_dist:
+                        best_station = station
+                
+                # Calculate fuel needed
+                fuel_needed = distance_since_last_stop / request.mpg_dge
+                
+                fuel_stop = FuelStop(
+                    station_id=str(best_station.get("id", "")),
+                    station_name=best_station.get("station_name", "Unknown Station"),
+                    address=best_station.get("street_address", ""),
+                    city=best_station.get("city", ""),
+                    state=best_station.get("state", ""),
+                    latitude=best_station.get("latitude", 0),
+                    longitude=best_station.get("longitude", 0),
+                    fuel_types=[request.fuel_type],
+                    distance_from_start=round(distance_from_start, 1),
+                    distance_from_previous=round(distance_since_last_stop, 1),
+                    estimated_fuel_needed=round(fuel_needed, 1),
+                    phone=best_station.get("station_phone"),
+                    access_hours=best_station.get("access_days_time")
+                )
+                fuel_stops.append(fuel_stop)
+                
+                # Add segment
+                segments.append(RouteSegment(
+                    from_location=current_location_name,
+                    to_location=fuel_stop.station_name,
+                    distance_miles=round(distance_since_last_stop, 1),
+                    distance_km=round(distance_since_last_stop * 1.60934, 1),
+                    estimated_time_hours=round(distance_since_last_stop / average_speed_mph, 2)
+                ))
+                
+                # Update current position
+                current_lat = best_station.get("latitude", waypoint_lat)
+                current_lng = best_station.get("longitude", waypoint_lng)
+                current_location_name = fuel_stop.station_name
+                distance_since_last_stop = 0
+            else:
+                warnings.append(f"Warning: Limited {request.fuel_type} stations found near waypoint {i}. Consider alternative fuel type or route.")
+    
+    # Add final segment to destination
+    final_distance = haversine_distance(
+        current_lat, current_lng,
+        request.destination_lat, request.destination_lng
+    )
+    segments.append(RouteSegment(
+        from_location=current_location_name,
+        to_location=request.destination_name,
+        distance_miles=round(final_distance, 1),
+        distance_km=round(final_distance * 1.60934, 1),
+        estimated_time_hours=round(final_distance / average_speed_mph, 2)
+    ))
+    
+    # Calculate totals
+    total_fuel_needed = total_distance_miles / request.mpg_dge
+    fuel_price = FUEL_PRICES.get(request.fuel_type, 3.00)
+    
+    return RoutePlan(
+        origin=RouteLocation(
+            name=request.origin_name,
+            latitude=request.origin_lat,
+            longitude=request.origin_lng
+        ),
+        destination=RouteLocation(
+            name=request.destination_name,
+            latitude=request.destination_lat,
+            longitude=request.destination_lng
+        ),
+        total_distance_miles=round(total_distance_miles, 1),
+        total_distance_km=round(total_distance_km, 1),
+        estimated_total_time_hours=round(estimated_hours, 2),
+        fuel_stops=fuel_stops,
+        segments=segments,
+        total_fuel_needed_dge=round(total_fuel_needed, 1),
+        estimated_fuel_cost=round(total_fuel_needed * fuel_price, 2),
+        vehicle_settings=VehicleSettings(
+            fuel_type=request.fuel_type,
+            tank_capacity_dge=request.tank_capacity_dge,
+            mpg_dge=request.mpg_dge,
+            reserve_percentage=request.reserve_percentage
+        ),
+        warnings=warnings
+    )
+
+@api_router.get("/route-planner/fuel-prices")
+async def get_fuel_prices():
+    """Get current estimated fuel prices per DGE"""
+    return FUEL_PRICES
+
 # Include the router in the main app
 app.include_router(api_router)
 
