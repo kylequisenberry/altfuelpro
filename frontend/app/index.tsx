@@ -275,6 +275,14 @@ export default function StationsScreen() {
         {/* Nearby and Filter Buttons */}
         <View style={styles.headerButtons}>
           <TouchableOpacity
+            style={styles.routePlannerButton}
+            onPress={() => setRoutePlannerVisible(true)}
+            data-testid="route-planner-btn"
+          >
+            <Ionicons name="map-outline" size={16} color={COLORS.secondary} />
+            <Text style={styles.routePlannerButtonText}>Plan Route</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.nearbyButton, nearbyMode && styles.nearbyButtonActive]}
             onPress={nearbyMode ? handleShowAll : findNearbyStations}
             disabled={locationLoading}
