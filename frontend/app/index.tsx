@@ -490,7 +490,23 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+  },
+  routePlannerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: `${COLORS.secondary}15`,
+    borderWidth: 1,
+    borderColor: COLORS.secondary,
+    gap: 4,
+  },
+  routePlannerButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.secondary,
   },
   nearbyButton: {
     flexDirection: 'row',
