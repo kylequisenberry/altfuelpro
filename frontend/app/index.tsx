@@ -437,6 +437,12 @@ export default function StationsScreen() {
         filters={filters}
         onApplyFilters={handleApplyFilters}
       />
+      
+      {/* Route Planner Modal */}
+      <RoutePlannerModal
+        visible={routePlannerVisible}
+        onClose={() => setRoutePlannerVisible(false)}
+      />
     </View>
   );
 }
