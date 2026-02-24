@@ -55,6 +55,7 @@ export default function StationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [routePlannerVisible, setRoutePlannerVisible] = useState(false);
   const [nearbyMode, setNearbyMode] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
