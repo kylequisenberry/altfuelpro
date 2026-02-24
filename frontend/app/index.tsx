@@ -20,6 +20,7 @@ import { FuelStation } from '../src/types';
 import { StationCard } from '../src/components/StationCard';
 import { StationsFilterModal, StationFilters } from '../src/components/StationsFilterModal';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
+import { RoutePlannerModal } from '../src/components/RoutePlannerModal';
 import { useLocation } from '../src/hooks/useLocation';
 import { COLORS, FUEL_TYPE_COLORS } from '../src/constants';
 
