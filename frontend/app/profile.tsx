@@ -152,6 +152,9 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <OfflineSettings />
         </View>
+
+        {/* Profile Info Section */}
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profile Information</Text>
             <TouchableOpacity onPress={() => setEditing(!editing)}>
