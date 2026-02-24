@@ -128,6 +128,83 @@ export const getServiceCenter = async (id: string): Promise<ServiceCenter> => {
   return response.data;
 };
 
+// Route Planner Types
+export interface RouteLocation {
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+}
+
+export interface VehicleSettings {
+  fuel_type: string;
+  tank_capacity_dge: number;
+  mpg_dge: number;
+  reserve_percentage: number;
+}
+
+export interface FuelStop {
+  station_id: string;
+  station_name: string;
+  address: string;
+  city: string;
+  state: string;
+  latitude: number;
+  longitude: number;
+  fuel_types: string[];
+  distance_from_start: number;
+  distance_from_previous: number;
+  estimated_fuel_needed: number;
+  phone?: string;
+  access_hours?: string;
+}
+
+export interface RouteSegment {
+  from_location: string;
+  to_location: string;
+  distance_miles: number;
+  distance_km: number;
+  estimated_time_hours: number;
+}
+
+export interface RoutePlan {
+  origin: RouteLocation;
+  destination: RouteLocation;
+  total_distance_miles: number;
+  total_distance_km: number;
+  estimated_total_time_hours: number;
+  fuel_stops: FuelStop[];
+  segments: RouteSegment[];
+  total_fuel_needed_dge: number;
+  estimated_fuel_cost: number;
+  vehicle_settings: VehicleSettings;
+  warnings: string[];
+}
+
+export interface RoutePlanRequest {
+  origin_lat: number;
+  origin_lng: number;
+  origin_name: string;
+  destination_lat: number;
+  destination_lng: number;
+  destination_name: string;
+  fuel_type: string;
+  tank_capacity_dge: number;
+  mpg_dge: number;
+  reserve_percentage: number;
+}
+
+// Route Planner API
+export const planRoute = async (request: RoutePlanRequest): Promise<RoutePlan> => {
+  const response = await api.post('/route-planner', request);
+  return response.data;
+};
+
+export const getFuelPrices = async (): Promise<Record<string, number>> => {
+  const response = await api.get('/route-planner/fuel-prices');
+  return response.data;
+};
+
 // Inspectors
 export const getInspectors = async (filters?: {
   fuel_type?: string;
