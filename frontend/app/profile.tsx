@@ -15,6 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { getProfile, updateProfile, submitFeedback, FeedbackCreate } from '../src/services/api';
 import { UserProfile } from '../src/types';
 import { LoadingSpinner } from '../src/components/LoadingSpinner';
+import { OfflineSettings } from '../src/components/OfflineSettings';
+import { OfflineBanner } from '../src/components/OfflineBanner';
+import { useNetworkStatus } from '../src/hooks/useNetworkStatus';
+import { getLastSyncTime } from '../src/services/offlineCache';
 import { COLORS, FUEL_TYPES } from '../src/constants';
 
 const FEEDBACK_TYPES = [
