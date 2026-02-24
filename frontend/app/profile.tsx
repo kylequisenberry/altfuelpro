@@ -133,6 +133,9 @@ export default function ProfileScreen() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Offline Banner */}
+      <OfflineBanner isOffline={isOffline} lastSyncTime={lastSyncTime} />
+      
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.header}>
@@ -144,9 +147,11 @@ export default function ProfileScreen() {
             <Text style={styles.userEmail}>{profile.email}</Text>
           )}
         </View>
-
-        {/* Profile Info Section */}
+        
+        {/* Offline Settings Section */}
         <View style={styles.section}>
+          <OfflineSettings />
+        </View>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profile Information</Text>
             <TouchableOpacity onPress={() => setEditing(!editing)}>
