@@ -221,6 +221,67 @@ class FeedbackCreate(BaseModel):
     user_name: Optional[str] = None
     platform: Optional[str] = None
 
+# ==================== ROUTE PLANNER MODELS ====================
+
+class RouteLocation(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+    address: Optional[str] = None
+
+class VehicleSettings(BaseModel):
+    fuel_type: str = "CNG"
+    tank_capacity_dge: float = 60  # Diesel Gallon Equivalent
+    mpg_dge: float = 6  # Miles per DGE
+    reserve_percentage: float = 15  # Keep 15% reserve
+
+class FuelStop(BaseModel):
+    station_id: str
+    station_name: str
+    address: str
+    city: str
+    state: str
+    latitude: float
+    longitude: float
+    fuel_types: List[str]
+    distance_from_start: float  # Miles
+    distance_from_previous: float  # Miles
+    estimated_fuel_needed: float  # DGE
+    phone: Optional[str] = None
+    access_hours: Optional[str] = None
+
+class RouteSegment(BaseModel):
+    from_location: str
+    to_location: str
+    distance_miles: float
+    distance_km: float
+    estimated_time_hours: float
+
+class RoutePlan(BaseModel):
+    origin: RouteLocation
+    destination: RouteLocation
+    total_distance_miles: float
+    total_distance_km: float
+    estimated_total_time_hours: float
+    fuel_stops: List[FuelStop]
+    segments: List[RouteSegment]
+    total_fuel_needed_dge: float
+    estimated_fuel_cost: float
+    vehicle_settings: VehicleSettings
+    warnings: List[str] = []
+
+class RoutePlanRequest(BaseModel):
+    origin_lat: float
+    origin_lng: float
+    origin_name: str = "Origin"
+    destination_lat: float
+    destination_lng: float
+    destination_name: str = "Destination"
+    fuel_type: str = "CNG"
+    tank_capacity_dge: float = 60
+    mpg_dge: float = 6
+    reserve_percentage: float = 15
+
 # ==================== FUEL SYSTEM PROVIDERS DATA ====================
 
 FUEL_SYSTEM_PROVIDERS = [
