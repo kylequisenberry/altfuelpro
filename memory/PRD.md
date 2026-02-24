@@ -60,6 +60,19 @@ A mobile app named "FuelPoint Navigator" for the Alternative Fuels market with t
   - Reusable NavigationButton component
   - Cross-platform support (web opens in new tab, mobile opens native apps)
 
+### Phase 6: Route Planner with Fuel Stops (Completed - Feb 24, 2025)
+- **Route Planning Feature:**
+  - "Plan Route" button on Stations tab opens modal
+  - Origin/destination city selection (12 popular US cities)
+  - Fuel type selection (CNG, LNG, Hydrogen, Electric)
+  - Vehicle settings: tank capacity (DGE), MPG, reserve percentage
+  - Backend calculates optimal fuel stops using AFDC API
+  - Shows: total distance, estimated time, fuel needed, cost estimate
+  - Navigate directly to each fuel stop
+  - Route segments breakdown
+  - Warnings for limited fuel station coverage
+- **Backend API:** `POST /api/route-planner` with Haversine formula for distance calculation
+
 ## Tech Stack
 - **Frontend:** React Native, Expo, Expo Router, TypeScript
 - **Backend:** Python, FastAPI, Pydantic
