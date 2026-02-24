@@ -73,6 +73,22 @@ A mobile app named "FuelPoint Navigator" for the Alternative Fuels market with t
   - Warnings for limited fuel station coverage
 - **Backend API:** `POST /api/route-planner` with Haversine formula for distance calculation
 
+### Phase 7: Offline Mode (Completed - Feb 24, 2025)
+- **Offline Data Access:**
+  - "Offline Mode" section in Profile tab
+  - "Download for Offline" button to cache stations and service centers
+  - Network status detection (online/offline badge)
+  - Cache statistics: station count, service center count, storage size
+  - Last sync timestamp display
+  - 24-hour cache expiration with auto-refresh
+  - "Clear Offline Data" option
+  - Offline banner when disconnected
+- **Technical Implementation:**
+  - AsyncStorage for persistent caching
+  - @react-native-community/netinfo for network detection
+  - Cross-platform support (web uses navigator.onLine)
+  - Reusable hooks: useNetworkStatus, offlineCache service
+
 ## Tech Stack
 - **Frontend:** React Native, Expo, Expo Router, TypeScript
 - **Backend:** Python, FastAPI, Pydantic
